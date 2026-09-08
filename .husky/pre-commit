@@ -1,0 +1,23 @@
+#!/bin/sh
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+echo "=== 1/4: Lint-staged (format + lint staged files) ==="
+./node_modules/.bin/lint-staged
+
+echo ""
+echo "=== 2/4: TypeScript (api) ==="
+npm run build -w @checkout/api
+
+echo ""
+echo "=== 3/4: TypeScript (web) ==="
+npm run typecheck -w @checkout/web
+
+echo ""
+echo "=== 4/4: Build ==="
+npm run build
+
+echo ""
+echo "✅ All pre-commit checks passed!"

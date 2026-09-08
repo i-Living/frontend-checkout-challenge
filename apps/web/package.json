@@ -1,0 +1,14 @@
+{
+  "name": "@checkout/web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate:api-types": "openapi-typescript ../../docs/openapi.json -o src/shared/api/generated.d.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "7.0.2"
+  }
+}
