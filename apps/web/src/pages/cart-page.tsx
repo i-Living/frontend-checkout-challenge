@@ -176,7 +176,7 @@ export function CartPage() {
                         })}
                     </CardContent>
                 </Card>
-                <Card className='min-w-0 lg:sticky lg:top-20'>
+                <Card className='min-w-0 lg:sticky lg:top-24'>
                     <CardHeader>
                         <CardTitle className='text-base'>Ваш заказ</CardTitle>
                     </CardHeader>

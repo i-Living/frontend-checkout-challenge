@@ -416,7 +416,7 @@ export function CheckoutPage() {
                         </Button>
                     ) : null}
                 </div>
-                <aside className='min-w-0 lg:sticky lg:top-4 lg:self-start'>
+                <aside className='min-w-0 lg:sticky lg:top-24 lg:self-start'>
                     <Card className='min-w-0'>
                         <CardHeader>
                             <CardTitle>Итого</CardTitle>
