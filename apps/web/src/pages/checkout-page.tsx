@@ -226,8 +226,7 @@ export function CheckoutPage() {
     const quote = quoteQuery.data
     const subtotal = quote?.subtotal ?? cart.subtotal
     const quoteError = quoteQuery.error
-    const isQuoteLoading = quoteEnabled && !quote
-    const isCourierIncomplete = draft.deliveryMethod === 'courier' && effectiveDelivery === null
+    const isQuoteLoading = quoteEnabled && !quote && !quoteQuery.isError
 
     return (
         <div>
@@ -306,11 +305,7 @@ export function CheckoutPage() {
                                         Повторить
                                     </Button>
                                 </>
-                            ) : isCourierIncomplete ? (
-                                <p className='text-muted-foreground text-sm'>
-                                    Заполните город, улицу и дом, чтобы посчитать доставку.
-                                </p>
-                            ) : (
+                            ) : isQuoteLoading ? (
                                 <p
                                     aria-live='polite'
                                     className='flex min-w-0 items-center gap-2 text-muted-foreground text-sm'
@@ -318,7 +313,7 @@ export function CheckoutPage() {
                                     <LoaderCircle aria-hidden className='size-4 shrink-0 animate-spin' />
                                     Считаем доставку…
                                 </p>
-                            )}
+                            ) : null}
                         </CardContent>
                     </Card>
                 </aside>

@@ -5,7 +5,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CheckoutPage } from '@/pages/checkout-page'
 import { createOrder, createQuote, getCart, getCheckoutOptions } from '@/shared/api/endpoints'
 import { useSessionStore } from '@/shared/store/session-store'
-import { makeApiError, makeCart, makeCheckoutOptions, makeOrder, makeQuote, validPickupDraft } from '@/test/fixtures'
+import {
+    emptyDraft,
+    makeApiError,
+    makeCart,
+    makeCheckoutOptions,
+    makeOrder,
+    makeQuote,
+    validPickupDraft,
+} from '@/test/fixtures'
 import { renderApp } from '@/test/render'
 
 vi.mock('@/shared/api/endpoints', async (importOriginal) => {
@@ -61,6 +69,29 @@ describe('CheckoutPage', () => {
             { method: 'pickup', pickupPointId: 'point-center' },
             expect.anything(),
         )
+    })
+
+    it('не показывает «Считаем доставку…», пока доставка не заполнена', async () => {
+        useSessionStore.getState().patchDraft(emptyDraft)
+        renderCheckout()
+        expect(await screen.findByText('Итого')).toBeInTheDocument()
+        expect(screen.queryByText('Считаем доставку…')).not.toBeInTheDocument()
+        expect(createQuoteMock).not.toHaveBeenCalled()
+    })
+
+    it('показывает «Считаем доставку…» только пока ждём ответ quote', async () => {
+        let resolveQuote: ((quote: ReturnType<typeof makeQuote>) => void) | undefined
+        createQuoteMock.mockImplementation(
+            () =>
+                new Promise((resolve) => {
+                    resolveQuote = resolve
+                }),
+        )
+        renderCheckout()
+        expect(await screen.findByText('Считаем доставку…')).toBeInTheDocument()
+        resolveQuote?.(makeQuote({ shipping: 0, total: 249000 }))
+        expect(await screen.findByText('К оплате')).toBeInTheDocument()
+        expect(screen.queryByText('Считаем доставку…')).not.toBeInTheDocument()
     })
 
     it('после конфликта версии корзины предлагает продолжить оформление', async () => {
