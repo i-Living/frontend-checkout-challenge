@@ -20,6 +20,7 @@ describe('ProductCard', () => {
         )
         await user.click(screen.getByRole('button', { name: 'В корзину' }))
         expect(onAdd).toHaveBeenCalledTimes(1)
+        expect(screen.getByText('Осталось: 10 шт.')).toBeInTheDocument()
     })
 
     it('блокирует товар с нулевым остатком', () => {
@@ -34,7 +35,8 @@ describe('ProductCard', () => {
             />,
         )
         expect(screen.getByRole('button', { name: 'Нет в наличии' })).toBeDisabled()
-        expect(screen.getAllByText('Нет в наличии').length).toBeGreaterThan(0)
+        expect(screen.getAllByText('Нет в наличии')).toHaveLength(1)
+        expect(screen.queryByText(/Осталось/)).not.toBeInTheDocument()
     })
 
     it('ставит абсолютное количество через степпер, не инкремент API', async () => {

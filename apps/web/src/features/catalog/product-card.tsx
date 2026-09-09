@@ -46,19 +46,15 @@ export function ProductCard({ product, quantityInCart, onAdd, onQuantity, onRemo
                 <CardTitle className='min-w-0 text-base leading-snug'>{product.title}</CardTitle>
                 <CardDescription className='min-w-0 line-clamp-2'>{product.description}</CardDescription>
             </CardHeader>
-            <CardContent className='flex min-w-0 flex-wrap items-center justify-between gap-2'>
+            <CardContent className='mt-auto flex min-w-0 flex-wrap items-center justify-between gap-2'>
                 <span className='font-semibold text-lg tabular-nums tracking-tight'>{formatMoney(product.price)}</span>
-                {outOfStock ? (
-                    <span className='rounded-full bg-muted px-2.5 py-1 font-medium text-muted-foreground text-xs'>
-                        Нет в наличии
-                    </span>
-                ) : (
+                {outOfStock ? null : (
                     <span className='rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary text-xs'>
-                        Остаток: {product.stock} шт.
+                        Осталось: {product.stock} шт.
                     </span>
                 )}
             </CardContent>
-            <CardFooter className='mt-auto flex min-w-0 flex-wrap items-center gap-2'>
+            <CardFooter className='flex min-w-0 flex-wrap items-center gap-2'>
                 {outOfStock ? (
                     <Button className='w-full sm:w-auto' disabled type='button'>
                         <PackageX />
