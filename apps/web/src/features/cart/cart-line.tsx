@@ -106,7 +106,7 @@ export function CartLine({ item, onQuantity, onRemove, isPending }: CartLineProp
                     <Plus />
                 </Button>
             </div>
-            <p className='min-w-0 font-semibold'>{formatMoney(item.lineTotal)}</p>
+            <p className='min-w-24 text-right font-semibold tabular-nums'>{formatMoney(item.lineTotal)}</p>
             <Button disabled={isPending} onClick={onRemove} size='sm' type='button' variant='ghost'>
                 <Trash2 />
                 Удалить

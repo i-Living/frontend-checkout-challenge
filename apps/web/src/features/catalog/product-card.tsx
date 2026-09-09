@@ -6,6 +6,7 @@ import type { Product } from '@/shared/api/endpoints'
 import { formatMoney } from '@/shared/lib/money'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/shared/ui/card'
+import { ProductVisual } from './product-visual'
 
 /**
  * Пропсы карточки товара.
@@ -39,7 +40,8 @@ export function ProductCard({ product, quantityInCart, onAdd, onQuantity, onRemo
     const outOfStock = product.stock === 0
     const inCart = quantityInCart > 0
     return (
-        <Card className='group flex min-w-0 flex-col overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-lg'>
+        <Card className='group flex min-w-0 flex-col overflow-hidden pt-0 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg'>
+            <ProductVisual productId={product.id} />
             <CardHeader className='min-w-0'>
                 <CardTitle className='min-w-0 text-base leading-snug'>{product.title}</CardTitle>
                 <CardDescription className='min-w-0 line-clamp-2'>{product.description}</CardDescription>
