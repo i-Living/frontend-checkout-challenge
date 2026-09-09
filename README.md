@@ -35,7 +35,7 @@ scripts/              проверки
 
 ```sh
 npm run check       # форматирование, сборка (api+web), тесты, typecheck web и OpenAPI
-npm run check:web   # только фронтенд: typecheck + сборка web
+npm run check:web   # только фронтенд: typecheck + тесты + сборка web
 npm run build
 npm start           # запуск собранного бэкенда
 ```
@@ -82,6 +82,8 @@ npm run dev -w @checkout/web
 
 ```sh
 npm run build -w @checkout/web
+npm run typecheck -w @checkout/web
+npm test -w @checkout/web
 npm run build   # contracts + api
 ```
 

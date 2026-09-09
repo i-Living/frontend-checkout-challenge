@@ -27,6 +27,9 @@ npm run dev -w @checkout/web
 ```sh
 npm run build -w @checkout/web
 npm run typecheck -w @checkout/web
+npm test -w @checkout/web
 ```
+
+Vitest + Testing Library покрывают HTTP-клиент, идемпотентность, сессию, поллинг оплаты, правила checkout и экраны каталога/корзины/оформления/оплаты/заказа. Тесты лежат в `apps/web/src/test/` и повторяют структуру исходников.
 
 Подробности решения (Query vs Zustand, HTTP-клиент D2, сценарии A/B, недоработки, время) — в разделе «Фронтенд `@checkout/web` (решение)» корневого `README.md`.
