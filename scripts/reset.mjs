@@ -1,6 +1,9 @@
 import { rm } from 'node:fs/promises';
-await rm(new URL('../.data/store.json', import.meta.url), { force: true });
-await rm(new URL('../.data/store.json.tmp', import.meta.url), { force: true });
+import { fileURLToPath } from 'node:url';
+
+const store = process.env.DATA_FILE ?? fileURLToPath(new URL('../.data/store.json', import.meta.url));
+await rm(store, { force: true });
+await rm(`${store}.tmp`, { force: true });
 console.log(
-  'Default local data cleared. Create a new session. Keep the API stopped while resetting.',
+  `Local data cleared: ${store}. Create a new session. Keep the API stopped while resetting.`,
 );
