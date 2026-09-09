@@ -1,12 +1,10 @@
 /**
  * Корневой layout приложения: шапка со счётчиком корзины и контент текущей страницы.
  */
-import { useQuery } from '@tanstack/react-query'
 import { ShoppingBasket, Store } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router'
 import { ThemeToggle } from '@/features/theme/theme-toggle'
-import { getCart } from '@/shared/api/endpoints'
-import { keys } from '@/shared/api/query-keys'
+import { useCart } from '@/shared/api/queries'
 import { cn } from '@/shared/lib/cn'
 import { ErrorBoundary } from '@/shared/ui/error-boundary'
 
@@ -16,10 +14,7 @@ import { ErrorBoundary } from '@/shared/ui/error-boundary'
  * @returns Разметка шапки и контента страницы
  */
 export function App() {
-    const cartQuery = useQuery({
-        queryKey: keys.cart,
-        queryFn: ({ signal }) => getCart(signal),
-    })
+    const cartQuery = useCart()
     const count = cartQuery.data?.quantity ?? 0
     return (
         <div className='flex min-h-screen flex-col bg-[radial-gradient(60rem_30rem_at_50%_-8rem,var(--color-primary)/12%,transparent)]'>

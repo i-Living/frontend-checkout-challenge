@@ -17,7 +17,7 @@ import {
     request,
     requestWithMeta,
 } from './client'
-import { isApiError } from './errors'
+import { isInvalidSessionError } from './errors'
 import { ensureSession } from './session'
 
 /** Прямой доступ к типам путей OpenAPI. */
@@ -66,6 +66,24 @@ export type SimulationScenario =
 export type Sandbox = operations['getSandbox']['responses'][200]['content']['application/json']['data']
 
 /**
+ * Повторяет запрос с новым токеном после SESSION_REQUIRED / SESSION_INVALID.
+ * @param run Функция запроса, принимающая токен.
+ */
+async function withSessionRetry<T>(run: (token: string) => Promise<T>): Promise<T> {
+    const token = await ensureSession()
+    try {
+        return await run(token)
+    } catch (error) {
+        if (!isInvalidSessionError(error)) {
+            throw error
+        }
+        useSessionStore.getState().clearToken()
+        const fresh = await ensureSession()
+        return await run(fresh)
+    }
+}
+
+/**
  * Выполняет запрос с токеном сессии и повторяет его после 401 с новой сессией.
  * @param path Путь запроса относительно API_BASE.
  * @param options Параметры запроса без токена.
@@ -73,21 +91,7 @@ export type Sandbox = operations['getSandbox']['responses'][200]['content']['app
  * @throws ApiError при неуспешном статусе после повтора.
  */
 async function withAuth<T>(path: string, options: Omit<RequestOptions, 'token'> = {}): Promise<T> {
-    const token = await ensureSession()
-    try {
-        return await request<T>(path, { ...options, token })
-    } catch (error) {
-        if (
-            isApiError(error) &&
-            error.status === 401 &&
-            (error.code === 'SESSION_REQUIRED' || error.code === 'SESSION_INVALID')
-        ) {
-            useSessionStore.getState().clearToken()
-            const fresh = await ensureSession()
-            return await request<T>(path, { ...options, token: fresh })
-        }
-        throw error
-    }
+    return withSessionRetry((token) => request<T>(path, { ...options, token }))
 }
 
 /**
@@ -102,21 +106,7 @@ async function withAuthMeta<T>(
     path: string,
     options: Omit<RequestOptions, 'token'> = {},
 ): Promise<{ data: T; headers: Headers }> {
-    const token = await ensureSession()
-    try {
-        return await requestWithMeta<T>(path, { ...options, token })
-    } catch (error) {
-        if (
-            isApiError(error) &&
-            error.status === 401 &&
-            (error.code === 'SESSION_REQUIRED' || error.code === 'SESSION_INVALID')
-        ) {
-            useSessionStore.getState().clearToken()
-            const fresh = await ensureSession()
-            return await requestWithMeta<T>(path, { ...options, token: fresh })
-        }
-        throw error
-    }
+    return withSessionRetry((token) => requestWithMeta<T>(path, { ...options, token }))
 }
 
 /**

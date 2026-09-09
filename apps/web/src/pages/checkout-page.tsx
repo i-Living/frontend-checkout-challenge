@@ -2,27 +2,44 @@
  * Экран оформления (`/checkout`).
  * Отвечает за форму checkout, расчёт доставки (quote), создание заказа и навигацию к оплате.
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, LoaderCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router'
 import { type CheckoutFieldErrors, CheckoutForm } from '@/features/checkout/checkout-form'
-import {
-    buildDelivery,
-    toOrderErrorMessage,
-    toServerFieldErrors,
-    validateDraft,
-} from '@/features/checkout/checkout-rules'
-import { type CreateOrderBody, createOrder, createQuote, getCart, getCheckoutOptions } from '@/shared/api/endpoints'
-import { isApiError } from '@/shared/api/errors'
+import { buildDelivery, toServerFieldErrors, validateDraft } from '@/features/checkout/checkout-rules'
+import { useQuote } from '@/features/checkout/use-quote'
+import { type CreateOrderBody, createOrder } from '@/shared/api/endpoints'
+import { getErrorCode, toErrorDescription, toErrorTitle } from '@/shared/api/errors'
 import { clearOrderKey, getOrCreateOrderKey } from '@/shared/api/idempotency'
-import { keys } from '@/shared/api/query-keys'
+import { invalidateCart } from '@/shared/api/invalidate'
+import { useCart, useCheckoutOptions } from '@/shared/api/queries'
 import { formatMoney } from '@/shared/lib/money'
+import { usePageTitle } from '@/shared/lib/use-page-title'
 import { type CheckoutDraft, useSessionStore } from '@/shared/store/session-store'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
+import { MutationAlert } from '@/shared/ui/mutation-alert'
+import { queryGate } from '@/shared/ui/query-gate'
 import { Skeleton } from '@/shared/ui/skeleton'
+
+/**
+ * Скелетон формы оформления.
+ */
+function CheckoutSkeleton() {
+    return (
+        <div className='grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]' role='status'>
+            <div className='flex min-w-0 flex-col gap-4'>
+                <Skeleton className='h-11 w-full' />
+                <Skeleton className='h-11 w-full' />
+                <Skeleton className='h-11 w-full' />
+                <Skeleton className='h-24 w-full' />
+            </div>
+            <Skeleton className='h-48 w-full' />
+        </div>
+    )
+}
 
 /**
  * Экран оформления (`/checkout`): форма покупателя и доставки плюс сайдбар с итогом.
@@ -30,6 +47,7 @@ import { Skeleton } from '@/shared/ui/skeleton'
  * @returns Разметка страницы оформления
  */
 export function CheckoutPage() {
+    usePageTitle('Оформление заказа')
     const queryClient = useQueryClient()
     const navigate = useNavigate()
     const draft = useSessionStore((state) => state.draft)
@@ -37,19 +55,15 @@ export function CheckoutPage() {
     const setOrderId = useSessionStore((state) => state.setOrder)
     const setPaymentId = useSessionStore((state) => state.setPayment)
     const [errors, setErrors] = useState<CheckoutFieldErrors>({})
-
-    useEffect(() => {
-        document.title = 'Оформление заказа — Магазин'
-    }, [])
-
-    const cartQuery = useQuery({
-        queryKey: keys.cart,
-        queryFn: ({ signal }) => getCart(signal),
+    const [debouncedAddress, setDebouncedAddress] = useState({
+        city: draft.city,
+        street: draft.street,
+        house: draft.house,
+        apartment: draft.apartment,
     })
-    const optionsQuery = useQuery({
-        queryKey: keys.checkoutOptions,
-        queryFn: ({ signal }) => getCheckoutOptions(signal),
-    })
+
+    const cartQuery = useCart()
+    const optionsQuery = useCheckoutOptions()
 
     useEffect(() => {
         if (!optionsQuery.data) {
@@ -73,13 +87,6 @@ export function CheckoutPage() {
         }
     }, [optionsQuery.data, draft.deliveryMethod, draft.paymentMethod, patchDraft])
 
-    const [debouncedAddress, setDebouncedAddress] = useState({
-        city: draft.city,
-        street: draft.street,
-        house: draft.house,
-        apartment: draft.apartment,
-    })
-
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedAddress({
@@ -100,49 +107,19 @@ export function CheckoutPage() {
     }, [draft, debouncedAddress])
 
     const effectiveDelivery = useMemo(() => buildDelivery(effectiveDraft), [effectiveDraft])
-    const deliveryKey = useMemo(
-        () => (effectiveDelivery ? JSON.stringify(effectiveDelivery) : null),
-        [effectiveDelivery],
-    )
     const cartVersion = cartQuery.data?.version
     const hasItems = (cartQuery.data?.items.length ?? 0) > 0
     const quoteEnabled =
         cartQuery.data !== undefined && hasItems && cartVersion !== undefined && effectiveDelivery !== null
-
-    // B5: ключ включает cartVersion и hash delivery — запоздавший ответ по старому
-    // ключу не затирает свежий, отмена через signal из Query.
-    // retry: 0 — quote это POST, неуспешный расчёт нельзя молча дублировать.
-    const quoteQuery = useQuery({
-        queryKey:
-            cartVersion === undefined || deliveryKey === null
-                ? keys.quote()
-                : keys.quoteByVersion(cartVersion, deliveryKey),
-        queryFn: ({ signal }) => {
-            if (cartVersion === undefined || effectiveDelivery === null) {
-                throw new Error('quote not ready')
-            }
-            return createQuote(cartVersion, effectiveDelivery, signal)
-        },
-        enabled: quoteEnabled,
-        retry: 0,
-    })
-
-    useEffect(() => {
-        const error = quoteQuery.error
-        if (isApiError(error) && error.code === 'CART_VERSION_CONFLICT') {
-            void queryClient.invalidateQueries({ queryKey: keys.cart })
-        }
-    }, [quoteQuery.error, queryClient])
+    const quoteQuery = useQuote(cartVersion, effectiveDelivery, quoteEnabled)
 
     const createOrderMutation = useMutation({
         mutationFn: ({ body, key }: { body: CreateOrderBody; key: string }) => createOrder(body, key),
         onSuccess: (order) => {
             clearOrderKey()
             setOrderId(order.id)
-            // Новый заказ — чужой paymentId из стора больше не валиден, сбрасываем,
-            // иначе pay-экран опросит старую попытку и уйдёт в редирект-петлю.
             setPaymentId(null)
-            void queryClient.invalidateQueries({ queryKey: keys.cart })
+            void invalidateCart(queryClient)
             if (order.paymentMethod === 'cash_on_delivery') {
                 navigate(`/orders/${order.id}`)
             } else {
@@ -154,16 +131,12 @@ export function CheckoutPage() {
             if (fieldErrors) {
                 setErrors((prev) => ({ ...prev, ...fieldErrors }))
             }
-            if (!isApiError(error)) {
-                return
-            }
-            if (error.code === 'CART_VERSION_CONFLICT' || error.code === 'CART_EMPTY') {
-                void queryClient.invalidateQueries({ queryKey: keys.cart })
-            } else if (error.code === 'QUOTE_EXPIRED') {
+            const code = getErrorCode(error)
+            if (code === 'CART_VERSION_CONFLICT' || code === 'CART_EMPTY') {
+                void invalidateCart(queryClient)
+            } else if (code === 'QUOTE_EXPIRED') {
                 void quoteQuery.refetch()
-            } else if (error.code === 'IDEMPOTENCY_CONFLICT') {
-                // Старый ключ привязан к другому телу: сбрасываем, чтобы повтор
-                // ушёл с новым ключом, а не получил тот же 409 вечно.
+            } else if (code === 'IDEMPOTENCY_CONFLICT') {
                 clearOrderKey()
             }
         },
@@ -172,7 +145,6 @@ export function CheckoutPage() {
     /**
      * Обновляет черновик и сбрасывает ошибки по затронутым полям.
      * @param patch Частичное обновление черновика
-     * @returns void
      */
     function handleDraftChange(patch: Partial<CheckoutDraft>) {
         patchDraft(patch)
@@ -206,7 +178,6 @@ export function CheckoutPage() {
     /**
      * Валидирует форму и создаёт заказ по текущему quote с ключом идемпотентности.
      * @param validData Актуальный черновик из формы
-     * @returns void
      */
     function handleSubmit(validData: CheckoutDraft) {
         const validation = validateDraft(validData)
@@ -228,59 +199,24 @@ export function CheckoutPage() {
                 phone: validData.phone.trim(),
             },
         }
-        // B2: повтор сети / двойной клик — те же key+body. Кнопка disabled isPending,
-        // clear только onSuccess, смена body даёт новый ключ внутри getOrCreate.
         const key = getOrCreateOrderKey(body)
         createOrderMutation.mutate({ body, key })
     }
 
-    if (cartQuery.isPending || optionsQuery.isPending) {
-        return (
-            <div aria-busy='true'>
-                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оформление заказа</h1>
-                <div className='grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]' role='status'>
-                    <div className='flex min-w-0 flex-col gap-4'>
-                        <Skeleton className='h-11 w-full' />
-                        <Skeleton className='h-11 w-full' />
-                        <Skeleton className='h-11 w-full' />
-                        <Skeleton className='h-24 w-full' />
-                    </div>
-                    <Skeleton className='h-48 w-full' />
-                </div>
-            </div>
-        )
-    }
-
-    if (cartQuery.isError || optionsQuery.isError) {
-        const error = cartQuery.isError ? cartQuery.error : optionsQuery.error
-        return (
-            <div>
-                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оформление заказа</h1>
-                <Alert variant='destructive'>
-                    <CircleAlert />
-                    <AlertTitle>Не удалось загрузить оформление</AlertTitle>
-                    <AlertDescription>{isApiError(error) ? error.message : 'Попробуйте ещё раз.'}</AlertDescription>
-                </Alert>
-                <Button
-                    className='mt-4 w-full sm:w-auto'
-                    onClick={() => {
-                        if (cartQuery.isError) {
-                            void cartQuery.refetch()
-                        }
-                        if (optionsQuery.isError) {
-                            void optionsQuery.refetch()
-                        }
-                    }}
-                    type='button'
-                >
-                    Повторить
-                </Button>
-            </div>
-        )
+    const blocked = queryGate([cartQuery, optionsQuery], {
+        title: 'Оформление заказа',
+        errorTitle: 'Не удалось загрузить оформление',
+        skeleton: <CheckoutSkeleton />,
+    })
+    if (blocked) {
+        return blocked
     }
 
     const cart = cartQuery.data
     const options = optionsQuery.data
+    if (!cart || !options) {
+        return null
+    }
 
     if (cart.items.length === 0) {
         return <Navigate replace to='/cart' />
@@ -290,8 +226,6 @@ export function CheckoutPage() {
     const quote = quoteQuery.data
     const subtotal = quote?.subtotal ?? cart.subtotal
     const quoteError = quoteQuery.error
-    // Submit ждёт готового quote: без расчёта заказывать нечего, а тихий refetch
-    // по клику выглядел как «кнопка ничего не делает».
     const isQuoteLoading = quoteEnabled && !quote
     const isCourierIncomplete = draft.deliveryMethod === 'courier' && effectiveDelivery === null
 
@@ -300,13 +234,11 @@ export function CheckoutPage() {
             <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оформление заказа</h1>
             <div className='grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]'>
                 <div className='min-w-0'>
-                    {createOrderMutation.isError ? (
-                        <Alert className='mb-4' variant='destructive'>
-                            <CircleAlert />
-                            <AlertTitle>Не удалось создать заказ</AlertTitle>
-                            <AlertDescription>{toOrderErrorMessage(createOrderMutation.error)}</AlertDescription>
-                        </Alert>
-                    ) : null}
+                    <MutationAlert
+                        className='mb-4'
+                        error={createOrderMutation.error}
+                        title='Не удалось создать заказ'
+                    />
                     <CheckoutForm
                         draft={draft}
                         errors={errors}
@@ -354,30 +286,16 @@ export function CheckoutPage() {
                                     <Alert variant='destructive'>
                                         <CircleAlert />
                                         <AlertTitle>
-                                            {isApiError(quoteError) && quoteError.code === 'CART_VERSION_CONFLICT'
-                                                ? 'Корзина изменилась'
-                                                : isApiError(quoteError) && quoteError.code === 'QUOTE_EXPIRED'
-                                                  ? 'Расчёт устарел'
-                                                  : 'Не удалось посчитать доставку'}
+                                            {toErrorTitle(quoteError, 'Не удалось посчитать доставку')}
                                         </AlertTitle>
-                                        <AlertDescription>
-                                            {isApiError(quoteError) && quoteError.code === 'CART_VERSION_CONFLICT'
-                                                ? 'Обновите корзину и продолжите оформление.'
-                                                : isApiError(quoteError) && quoteError.code === 'QUOTE_EXPIRED'
-                                                  ? 'Создайте новый расчёт с той же доставкой.'
-                                                  : isApiError(quoteError)
-                                                    ? quoteError.message
-                                                    : 'Попробуйте ещё раз.'}
-                                        </AlertDescription>
+                                        <AlertDescription>{toErrorDescription(quoteError)}</AlertDescription>
                                     </Alert>
                                     <Button
                                         className='w-full sm:w-auto'
                                         disabled={quoteQuery.isFetching}
                                         onClick={() => {
-                                            if (isApiError(quoteError) && quoteError.code === 'CART_VERSION_CONFLICT') {
-                                                void queryClient
-                                                    .invalidateQueries({ queryKey: keys.cart })
-                                                    .then(() => quoteQuery.refetch())
+                                            if (getErrorCode(quoteError) === 'CART_VERSION_CONFLICT') {
+                                                void invalidateCart(queryClient).then(() => quoteQuery.refetch())
                                             } else {
                                                 void quoteQuery.refetch()
                                             }

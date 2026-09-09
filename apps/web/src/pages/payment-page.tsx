@@ -2,43 +2,35 @@
  * Экран оплаты (`/orders/:orderId/pay`).
  * Отвечает за тестовые карты, создание попытки оплаты, симуляцию, опрос статуса и повторы.
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, Info, LoaderCircle } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router'
 import { CardPicker } from '@/features/payment/card-picker'
+import { refreshOrderAfterPayment, usePaymentAttempt } from '@/features/payment/use-payment-attempt'
 import { usePaymentPoll } from '@/features/payment/use-payment-poll'
-import {
-    createPayment,
-    createSimulation,
-    getOrder,
-    getSandbox,
-    listOrders,
-    listPayments,
-    type Payment,
-    type SimulationScenario,
-} from '@/shared/api/endpoints'
-import { isApiError } from '@/shared/api/errors'
-import { clearPaymentKey, getOrCreatePaymentKey } from '@/shared/api/idempotency'
-import { keys } from '@/shared/api/query-keys'
-import { orThrow } from '@/shared/lib/assert'
+import { getErrorCode } from '@/shared/api/errors'
+import { useOrder, useOrdersList, usePayments, useSandbox } from '@/shared/api/queries'
+import { usePageTitle } from '@/shared/lib/use-page-title'
 import { useSessionStore } from '@/shared/store/session-store'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
+import { MutationAlert } from '@/shared/ui/mutation-alert'
+import { queryGate } from '@/shared/ui/query-gate'
 import { Skeleton } from '@/shared/ui/skeleton'
 
-interface AttemptVariables {
-    scenario: SimulationScenario
-}
-
 /**
- * Превращает ошибку оплаты/загрузки в текст для алерта.
- * @param error Произвольная ошибка запроса
- * @returns Текст сообщения пользователю
+ * Скелетон экрана оплаты.
  */
-function toErrorMessage(error: unknown): string {
-    return isApiError(error) ? error.message : 'Попробуйте ещё раз.'
+function PaymentSkeleton() {
+    return (
+        <div aria-busy='true' className='flex min-w-0 flex-col gap-3' role='status'>
+            <Skeleton className='h-11 w-full' />
+            <Skeleton className='h-11 w-full' />
+            <Skeleton className='h-10 w-40' />
+        </div>
+    )
 }
 
 /**
@@ -48,39 +40,21 @@ function toErrorMessage(error: unknown): string {
  * @returns Разметка страницы оплаты
  */
 export function PaymentPage() {
+    usePageTitle('Оплата заказа')
     const { orderId } = useParams()
     const navigate = useNavigate()
     const queryClient = useQueryClient()
     const storedPaymentId = useSessionStore((state) => state.paymentId)
     const storedOrderId = useSessionStore((state) => state.orderId)
-    const setPayment = useSessionStore((state) => state.setPayment)
     const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
-    const [attemptPaymentId, setAttemptPaymentId] = useState<string | null>(null)
-    const [pollIntervalMs, setPollIntervalMs] = useState(800)
-    const generationRef = useRef(0)
 
-    const orderQuery = useQuery({
-        queryKey: keys.order(orderId),
-        queryFn: ({ signal }) => getOrder(orThrow(orderId, 'orderId'), signal),
-        enabled: Boolean(orderId),
-    })
+    const orderQuery = useOrder(orderId)
     const isCashOrder = orderQuery.data?.paymentMethod !== undefined && orderQuery.data.paymentMethod !== 'card'
     const isCardOrder = orderQuery.data?.paymentMethod === 'card'
-    const sandboxQuery = useQuery({
-        queryKey: keys.sandbox,
-        queryFn: ({ signal }) => getSandbox(signal),
-        enabled: Boolean(orderId) && isCardOrder,
-    })
-    const paymentsQuery = useQuery({
-        queryKey: keys.payments(orderId),
-        queryFn: ({ signal }) => listPayments(orThrow(orderId, 'orderId'), signal),
-        enabled: Boolean(orderId) && isCardOrder,
-    })
-    const recoveryOrdersQuery = useQuery({
-        queryKey: keys.ordersList,
-        queryFn: ({ signal }) => listOrders(signal),
-        enabled: !orderId && !storedOrderId,
-    })
+    const sandboxQuery = useSandbox(Boolean(orderId) && isCardOrder)
+    const paymentsQuery = usePayments(orderId, Boolean(orderId) && isCardOrder)
+    const recoveryOrdersQuery = useOrdersList(!orderId && !storedOrderId)
+    const attempt = usePaymentAttempt(orderId)
 
     const sandboxCards = sandboxQuery.data?.cards ?? []
     useEffect(() => {
@@ -91,183 +65,45 @@ export function PaymentPage() {
 
     const resumeId =
         paymentsQuery.data?.find((item) => item.status === 'pending' || item.status === 'processing')?.id ?? null
-    // B3: reload продолжает poll. stored paymentId используем, только если он принадлежит
-    // ТЕКУЩЕМУ заказу (есть в его списке попыток): иначе опрос чужого succeeded после
-    // прошлой покупки редиректит на order-экран, откуда ведёт обратно — петля туда-обратно.
-    // Список — источник правды с сервера; resumeId покрывает reload и без stored.
     const orderPaymentIds = useMemo(
         () => new Set((paymentsQuery.data ?? []).map((item) => item.id)),
         [paymentsQuery.data],
     )
     const storedForThisOrder = storedPaymentId && orderPaymentIds.has(storedPaymentId) ? storedPaymentId : null
-    const effectivePaymentId = attemptPaymentId ?? storedForThisOrder ?? resumeId
-    const { payment, isTerminal } = usePaymentPoll(effectivePaymentId, !isCashOrder, pollIntervalMs)
-
-    useEffect(() => {
-        document.title = 'Оплата заказа — Магазин'
-    }, [])
+    const effectivePaymentId = attempt.attemptPaymentId ?? storedForThisOrder ?? resumeId
+    const { payment, isTerminal } = usePaymentPoll(effectivePaymentId, !isCashOrder, attempt.pollIntervalMs)
 
     useEffect(() => {
         if (isTerminal && orderId) {
-            void queryClient.invalidateQueries({ queryKey: keys.order(orderId) })
-            void queryClient.invalidateQueries({ queryKey: keys.payments(orderId) })
+            refreshOrderAfterPayment(queryClient, orderId)
         }
     }, [isTerminal, orderId, queryClient])
 
-    // B2: повтор сети / двойной клик — те же key+body через getOrCreate.
-    // Новый ключ только после успеха (clear в onSuccess) или смены body/orderId,
-    // а также после PAYMENT_FINALIZED (см. onError ниже): иначе retry реплеит
-    // ту же финализированную попытку и вечно получает 409.
-    /**
-     * Создаёт платёж с ключом идемпотентности и запускает симуляцию сценария карты.
-     * @param scenario Сценарий песочницы выбранной карты
-     * @param generation Поколение попытки для отсева устаревших ответов
-     * @returns Созданный платёж и серверная пауза Retry-After для поллинга
-     */
-    async function runAttempt(
-        scenario: SimulationScenario,
-        generation: number,
-    ): Promise<{ payment: Payment; retryAfterMs: number | null }> {
-        const id = orThrow(orderId, 'orderId')
-        const key = getOrCreatePaymentKey(id, {})
-        const created = await createPayment(id, key)
-        if (generation !== generationRef.current) {
-            throw new Error('stale')
-        }
-        const { retryAfterMs } = await createSimulation(created.id, scenario)
-        if (generation !== generationRef.current) {
-            throw new Error('stale')
-        }
-        return { payment: created, retryAfterMs }
-    }
-
-    const payMutation = useMutation({
-        mutationFn: ({ scenario }: AttemptVariables) => runAttempt(scenario, generationRef.current),
-        onSuccess: (result) => {
-            // B2: успех — новый ключ для следующей попытки (retry после fail/cancel).
-            clearPaymentKey()
-            setPollIntervalMs(result.retryAfterMs ?? 800)
-            setAttemptPaymentId(result.payment.id)
-            setPayment(result.payment.id)
-            void queryClient.invalidateQueries({ queryKey: keys.payment(result.payment.id) })
-            if (orderId) {
-                void queryClient.invalidateQueries({ queryKey: keys.payments(orderId) })
-            }
-        },
-        onError: (error: unknown) => {
-            if (!isApiError(error)) {
-                return
-            }
-            if (error.code === 'PAYMENT_FINALIZED') {
-                // Попытка финализирована: старый ключ бесполезен, сбрасываем,
-                // чтобы «Оплатить снова» создала новую попытку с новым ключом.
-                clearPaymentKey()
-            }
-            if ((error.code === 'PAYMENT_FINALIZED' || error.code === 'PAYMENT_IN_PROGRESS') && orderId) {
-                void queryClient.invalidateQueries({ queryKey: keys.payments(orderId) })
-            }
-        },
-    })
-
-    /**
-     * Создаёт попытку и запускает сценарий cancel — закрытие формы без оплаты.
-     * Не вызывается во время processing: у попытки уже есть симуляция, второй сценарий даст 409.
-     * @param generation Поколение попытки для отсева устаревших ответов
-     * @returns Созданный платёж и серверная пауза Retry-After для поллинга
-     */
-    async function runCancel(generation: number): Promise<{ payment: Payment; retryAfterMs: number | null }> {
-        const id = orThrow(orderId, 'orderId')
-        const key = getOrCreatePaymentKey(id, {})
-        const created = await createPayment(id, key)
-        if (generation !== generationRef.current) {
-            throw new Error('stale')
-        }
-        const { retryAfterMs } = await createSimulation(created.id, 'cancel')
-        if (generation !== generationRef.current) {
-            throw new Error('stale')
-        }
-        return { payment: created, retryAfterMs }
-    }
-
-    const cancelMutation = useMutation({
-        mutationFn: () => runCancel(generationRef.current),
-        onSuccess: (result) => {
-            clearPaymentKey()
-            setPollIntervalMs(result.retryAfterMs ?? 800)
-            setAttemptPaymentId(result.payment.id)
-            setPayment(result.payment.id)
-            void queryClient.invalidateQueries({ queryKey: keys.payment(result.payment.id) })
-            if (orderId) {
-                void queryClient.invalidateQueries({ queryKey: keys.payments(orderId) })
-            }
-        },
-        onError: (error: unknown) => {
-            if (!isApiError(error)) {
-                return
-            }
-            if (error.code === 'PAYMENT_FINALIZED') {
-                clearPaymentKey()
-            }
-            if ((error.code === 'PAYMENT_FINALIZED' || error.code === 'PAYMENT_IN_PROGRESS') && orderId) {
-                void queryClient.invalidateQueries({ queryKey: keys.payments(orderId) })
-            }
-        },
-    })
-
-    const payErrorCode = isApiError(payMutation.error) ? payMutation.error.code : null
-    const cancelErrorCode = isApiError(cancelMutation.error) ? cancelMutation.error.code : null
-
     useEffect(() => {
         if (payment?.status === 'succeeded' && orderId) {
-            void queryClient.invalidateQueries({ queryKey: keys.order(orderId) })
-            void queryClient.invalidateQueries({ queryKey: keys.payments(orderId) })
+            refreshOrderAfterPayment(queryClient, orderId)
             navigate(`/orders/${orderId}`, { replace: true })
         }
     }, [payment?.status, orderId, queryClient, navigate])
 
     useEffect(() => {
-        if (payErrorCode === 'ORDER_ALREADY_PAID' && orderId) {
-            void queryClient.invalidateQueries({ queryKey: keys.order(orderId) })
+        if (attempt.errorCode === 'ORDER_ALREADY_PAID' && orderId) {
+            refreshOrderAfterPayment(queryClient, orderId)
             navigate(`/orders/${orderId}`, { replace: true })
         }
-    }, [payErrorCode, orderId, queryClient, navigate])
+    }, [attempt.errorCode, orderId, queryClient, navigate])
 
     if (!orderId) {
-        // B3: orderId потерян — не выдумывать id. Сначала stored из checkout.v1,
-        // иначе GET /api/orders и взять актуальный (сервер отдаёт новые сверху).
         if (storedOrderId) {
             return <Navigate replace to={`/orders/${storedOrderId}/pay`} />
         }
-        if (recoveryOrdersQuery.isPending) {
-            return (
-                <div>
-                    <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
-                    <div aria-busy='true' className='flex min-w-0 flex-col gap-3' role='status'>
-                        <Skeleton className='h-11 w-full' />
-                        <Skeleton className='h-11 w-full' />
-                        <Skeleton className='h-10 w-40' />
-                    </div>
-                </div>
-            )
-        }
-        if (recoveryOrdersQuery.isError) {
-            return (
-                <div>
-                    <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
-                    <Alert variant='destructive'>
-                        <CircleAlert />
-                        <AlertTitle>Не удалось загрузить заказ</AlertTitle>
-                        <AlertDescription>{toErrorMessage(recoveryOrdersQuery.error)}</AlertDescription>
-                    </Alert>
-                    <Button
-                        className='mt-4 w-full sm:w-auto'
-                        onClick={() => void recoveryOrdersQuery.refetch()}
-                        type='button'
-                    >
-                        Повторить
-                    </Button>
-                </div>
-            )
+        const recoveryBlocked = queryGate(recoveryOrdersQuery, {
+            title: 'Оплата заказа',
+            errorTitle: 'Не удалось загрузить заказ',
+            skeleton: <PaymentSkeleton />,
+        })
+        if (recoveryBlocked) {
+            return recoveryBlocked
         }
         const latest = recoveryOrdersQuery.data?.[0]
         if (latest) {
@@ -276,49 +112,21 @@ export function PaymentPage() {
         return <Navigate replace to='/' />
     }
 
-    if (orderQuery.isPending) {
-        return (
-            <div>
-                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
-                <div aria-busy='true' className='flex min-w-0 flex-col gap-3' role='status'>
-                    <Skeleton className='h-11 w-full' />
-                    <Skeleton className='h-11 w-full' />
-                    <Skeleton className='h-10 w-40' />
-                </div>
-            </div>
-        )
-    }
-
-    if (orderQuery.isError) {
-        const isNotFound = isApiError(orderQuery.error) && orderQuery.error.status === 404
-        return (
-            <div>
-                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
-                <Alert variant='destructive'>
-                    <CircleAlert />
-                    <AlertTitle>{isNotFound ? 'Заказ не найден' : 'Не удалось загрузить заказ'}</AlertTitle>
-                    <AlertDescription>
-                        {isNotFound
-                            ? 'Такого заказа нет. Возможно, данные были сброшены.'
-                            : toErrorMessage(orderQuery.error)}
-                    </AlertDescription>
-                </Alert>
-                <div className='mt-4 flex min-w-0 flex-wrap gap-2'>
-                    {isNotFound ? (
-                        <Button asChild className='w-full sm:w-auto'>
-                            <Link to='/'>Вернуться в каталог</Link>
-                        </Button>
-                    ) : (
-                        <Button className='w-full sm:w-auto' onClick={() => void orderQuery.refetch()} type='button'>
-                            Повторить
-                        </Button>
-                    )}
-                </div>
-            </div>
-        )
+    const orderBlocked = queryGate(orderQuery, {
+        title: 'Оплата заказа',
+        errorTitle: 'Не удалось загрузить заказ',
+        skeleton: <PaymentSkeleton />,
+        notFoundTitle: 'Заказ не найден',
+        notFoundDescription: 'Такого заказа нет. Возможно, данные были сброшены.',
+    })
+    if (orderBlocked) {
+        return orderBlocked
     }
 
     const order = orderQuery.data
+    if (!order) {
+        return null
+    }
 
     if (order.paymentMethod !== 'card') {
         return <Navigate replace to={`/orders/${orderId}`} />
@@ -328,100 +136,57 @@ export function PaymentPage() {
         return <Navigate replace to={`/orders/${orderId}`} />
     }
 
-    if (isApiError(payMutation.error) && payMutation.error.code === 'PAYMENT_NOT_REQUIRED') {
+    if (attempt.errorCode === 'PAYMENT_NOT_REQUIRED') {
         return <Navigate replace to={`/orders/${orderId}`} />
     }
 
-    // ORDER_ALREADY_PAID обрабатывается эффектом выше (инвалидация + навигация),
-    // отдельный render-редирект не нужен.
-    if (sandboxQuery.isPending) {
-        return (
-            <div>
-                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
-                <div aria-busy='true' className='flex min-w-0 flex-col gap-3' role='status'>
-                    <Skeleton className='h-11 w-full' />
-                    <Skeleton className='h-11 w-full' />
-                    <Skeleton className='h-10 w-40' />
-                </div>
-            </div>
-        )
-    }
-
-    if (sandboxQuery.isError) {
-        return (
-            <div>
-                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
-                <Alert variant='destructive'>
-                    <CircleAlert />
-                    <AlertTitle>Не удалось загрузить тестовые карты</AlertTitle>
-                    <AlertDescription>{toErrorMessage(sandboxQuery.error)}</AlertDescription>
-                </Alert>
-                <Button className='mt-4 w-full sm:w-auto' onClick={() => void sandboxQuery.refetch()} type='button'>
-                    Повторить
-                </Button>
-            </div>
-        )
+    const sandboxBlocked = queryGate(sandboxQuery, {
+        title: 'Оплата заказа',
+        errorTitle: 'Не удалось загрузить тестовые карты',
+        skeleton: <PaymentSkeleton />,
+    })
+    if (sandboxBlocked) {
+        return sandboxBlocked
     }
 
     const isDeclined = payment?.status === 'failed'
     const isCancelled = payment?.status === 'cancelled'
-    const showRetry =
-        isDeclined || isCancelled || payErrorCode === 'PAYMENT_FINALIZED' || cancelErrorCode === 'PAYMENT_FINALIZED'
-    const showInProgress = payErrorCode === 'PAYMENT_IN_PROGRESS'
-    const showFinalized = payErrorCode === 'PAYMENT_FINALIZED' || cancelErrorCode === 'PAYMENT_FINALIZED'
-    const isProcessing =
-        payMutation.isPending ||
-        cancelMutation.isPending ||
-        payment?.status === 'pending' ||
-        payment?.status === 'processing'
-    const mutationError = payMutation.error
-    const isStaleError = mutationError instanceof Error && mutationError.message === 'stale'
+    const showRetry = isDeclined || isCancelled || attempt.errorCode === 'PAYMENT_FINALIZED'
+    const showInProgress = attempt.errorCode === 'PAYMENT_IN_PROGRESS'
+    const showFinalized = attempt.errorCode === 'PAYMENT_FINALIZED'
+    const isProcessing = attempt.isPending || payment?.status === 'pending' || payment?.status === 'processing'
     const isHandledPayCode =
-        payErrorCode === 'PAYMENT_IN_PROGRESS' ||
-        payErrorCode === 'PAYMENT_FINALIZED' ||
-        payErrorCode === 'ORDER_ALREADY_PAID' ||
-        payErrorCode === 'PAYMENT_NOT_REQUIRED'
-    const showGenericPayError = mutationError !== null && !isStaleError && !isHandledPayCode
-    const isStaleCancel = cancelMutation.error instanceof Error && cancelMutation.error.message === 'stale'
+        attempt.errorCode === 'PAYMENT_IN_PROGRESS' ||
+        attempt.errorCode === 'PAYMENT_FINALIZED' ||
+        attempt.errorCode === 'ORDER_ALREADY_PAID' ||
+        attempt.errorCode === 'PAYMENT_NOT_REQUIRED'
+    const showGenericPayError =
+        attempt.error != null && !attempt.isStaleError && !isHandledPayCode && attempt.lastAction !== 'cancel'
     const showGenericCancelError =
-        cancelMutation.error !== null && cancelErrorCode !== 'PAYMENT_FINALIZED' && !isStaleCancel
+        attempt.error != null &&
+        getErrorCode(attempt.error) !== 'PAYMENT_FINALIZED' &&
+        !attempt.isStaleError &&
+        attempt.lastAction === 'cancel'
     const selectedCard = sandboxCards.find((card) => card.id === selectedCardId) ?? null
 
     /**
      * Запускает новую попытку оплаты по выбранной карте.
-     * @returns void
      */
     function handlePay() {
         if (!selectedCard || isProcessing) {
             return
         }
-        if (payErrorCode === 'PAYMENT_FINALIZED' || cancelErrorCode === 'PAYMENT_FINALIZED') {
-            // Прошлая попытка финализирована (на случай, если onError не успел
-            // сбросить ключ): новая попытка обязана идти с новым ключом.
-            clearPaymentKey()
-            if (orderId) {
-                void queryClient.invalidateQueries({ queryKey: keys.payments(orderId) })
-            }
-        }
-        generationRef.current += 1
-        payMutation.reset()
-        cancelMutation.reset()
-        payMutation.mutate({ scenario: selectedCard.scenario })
+        attempt.startPay(selectedCard.scenario)
     }
 
     /**
      * Закрывает форму без оплаты: новая попытка со сценарием cancel.
-     * Во время processing не вызывается — у попытки уже есть симуляция.
-     * @returns void
      */
     function handleCancel() {
-        if (payMutation.isPending || cancelMutation.isPending || isTerminal || isProcessing) {
+        if (attempt.isPending || isTerminal || isProcessing) {
             return
         }
-        generationRef.current += 1
-        payMutation.reset()
-        cancelMutation.reset()
-        cancelMutation.mutate()
+        attempt.startCancel()
     }
 
     return (
@@ -485,40 +250,19 @@ export function PaymentPage() {
                             </AlertDescription>
                         </Alert>
                     ) : null}
-                    {showGenericPayError ? (
-                        <Alert variant='destructive'>
-                            <CircleAlert />
-                            <AlertTitle>Не удалось оплатить</AlertTitle>
-                            <AlertDescription>{toErrorMessage(mutationError)}</AlertDescription>
-                        </Alert>
-                    ) : null}
+                    {showGenericPayError ? <MutationAlert error={attempt.error} title='Не удалось оплатить' /> : null}
                     {showGenericCancelError ? (
-                        <Alert variant='destructive'>
-                            <CircleAlert />
-                            <AlertTitle>Не удалось отменить</AlertTitle>
-                            <AlertDescription>{toErrorMessage(cancelMutation.error)}</AlertDescription>
-                        </Alert>
+                        <MutationAlert error={attempt.error} title='Не удалось отменить' />
                     ) : null}
                     <div className='flex min-w-0 flex-wrap gap-2'>
-                        {showRetry ? (
-                            <Button
-                                className='w-full sm:w-auto'
-                                disabled={isProcessing || !selectedCard}
-                                onClick={handlePay}
-                                type='button'
-                            >
-                                Оплатить снова
-                            </Button>
-                        ) : (
-                            <Button
-                                className='w-full sm:w-auto'
-                                disabled={isProcessing || !selectedCard}
-                                onClick={handlePay}
-                                type='button'
-                            >
-                                Оплатить
-                            </Button>
-                        )}
+                        <Button
+                            className='w-full sm:w-auto'
+                            disabled={isProcessing || !selectedCard}
+                            onClick={handlePay}
+                            type='button'
+                        >
+                            {showRetry ? 'Оплатить снова' : 'Оплатить'}
+                        </Button>
                         <Button
                             className='w-full sm:w-auto'
                             disabled={isProcessing || isTerminal}

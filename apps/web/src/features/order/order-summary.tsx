@@ -1,9 +1,8 @@
 /**
  * Краткая сводка заказа: позиции, доставка и итоги.
  */
-import { useQuery } from '@tanstack/react-query'
-import { getCheckoutOptions, type Order } from '@/shared/api/endpoints'
-import { keys } from '@/shared/api/query-keys'
+import type { Order } from '@/shared/api/endpoints'
+import { useCheckoutOptions } from '@/shared/api/queries'
 import { formatMoney } from '@/shared/lib/money'
 
 /**
@@ -34,11 +33,7 @@ function deliveryText(order: Order, pickupTitle?: string): string {
  */
 export function OrderSummary({ order }: OrderSummaryProps) {
     // Название пункта выдачи — только из API, сырой id не показываем без подписи.
-    const optionsQuery = useQuery({
-        queryKey: keys.checkoutOptions,
-        queryFn: ({ signal }) => getCheckoutOptions(signal),
-        staleTime: 60_000,
-    })
+    const optionsQuery = useCheckoutOptions(60_000)
     const pickupPoints = optionsQuery.data?.deliveryMethods.find((item) => item.id === 'pickup')?.pickupPoints ?? []
     const pickupPointId = order.delivery.method === 'pickup' ? order.delivery.pickupPointId : undefined
     const pickupPoint = pickupPointId ? pickupPoints.find((point) => point.id === pickupPointId) : undefined

@@ -8,8 +8,9 @@ import type { CheckoutOptions } from '@/shared/api/endpoints'
 import type { CheckoutDraft } from '@/shared/store/session-store'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card'
+import { FormField } from '@/shared/ui/form-field'
 import { Input } from '@/shared/ui/input'
-import { Label } from '@/shared/ui/label'
+import { OptionRadioGroup } from '@/shared/ui/option-radio-group'
 import { DeliveryFields } from './delivery-fields'
 
 /**
@@ -21,13 +22,6 @@ export type CheckoutFieldErrors = Partial<
 
 /**
  * Пропсы формы оформления заказа.
- * @property draft черновик данных покупателя и доставки
- * @property errors ошибки валидации по полям
- * @property options доступные способы доставки и оплаты
- * @property isPending блокировка отправки на время запроса
- * @property submitLabel текст кнопки отправки
- * @property onDraftChange обработчик изменения черновика
- * @property onSubmit обработчик отправки формы
  */
 interface CheckoutFormProps {
     draft: CheckoutDraft
@@ -41,13 +35,6 @@ interface CheckoutFormProps {
 
 /**
  * Форма оформления заказа с контактами, доставкой и оплатой.
- * @param draft черновик данных покупателя и доставки
- * @param errors ошибки валидации по полям
- * @param options доступные способы доставки и оплаты
- * @param isPending блокировка отправки на время запроса
- * @param submitLabel текст кнопки отправки
- * @param onDraftChange обработчик изменения черновика
- * @param onSubmit обработчик отправки формы
  */
 export function CheckoutForm({
     draft,
@@ -80,57 +67,30 @@ export function CheckoutForm({
                     <CardTitle className='text-base'>Контакты</CardTitle>
                 </CardHeader>
                 <CardContent className='flex min-w-0 flex-col gap-4'>
-                    <div className='flex min-w-0 flex-col gap-1.5'>
-                        <Label htmlFor='checkout-name'>Имя</Label>
+                    <FormField error={errors.name} id='checkout-name' label='Имя'>
                         <Input
-                            aria-describedby={errors.name ? 'checkout-name-error' : undefined}
-                            aria-invalid={Boolean(errors.name)}
                             autoComplete='name'
-                            id='checkout-name'
                             onChange={(event) => onDraftChange({ name: event.target.value })}
                             value={draft.name}
                         />
-                        {errors.name ? (
-                            <p className='text-destructive text-sm' id='checkout-name-error' role='alert'>
-                                {errors.name}
-                            </p>
-                        ) : null}
-                    </div>
-                    <div className='flex min-w-0 flex-col gap-1.5'>
-                        <Label htmlFor='checkout-email'>Email</Label>
+                    </FormField>
+                    <FormField error={errors.email} id='checkout-email' label='Email'>
                         <Input
-                            aria-describedby={errors.email ? 'checkout-email-error' : undefined}
-                            aria-invalid={Boolean(errors.email)}
                             autoComplete='email'
-                            id='checkout-email'
                             onChange={(event) => onDraftChange({ email: event.target.value })}
                             type='email'
                             value={draft.email}
                         />
-                        {errors.email ? (
-                            <p className='text-destructive text-sm' id='checkout-email-error' role='alert'>
-                                {errors.email}
-                            </p>
-                        ) : null}
-                    </div>
-                    <div className='flex min-w-0 flex-col gap-1.5'>
-                        <Label htmlFor='checkout-phone'>Телефон</Label>
+                    </FormField>
+                    <FormField error={errors.phone} id='checkout-phone' label='Телефон'>
                         <Input
-                            aria-describedby={errors.phone ? 'checkout-phone-error' : undefined}
-                            aria-invalid={Boolean(errors.phone)}
                             autoComplete='tel'
-                            id='checkout-phone'
                             onChange={(event) => onDraftChange({ phone: event.target.value })}
                             placeholder='+79990000000'
                             type='tel'
                             value={draft.phone}
                         />
-                        {errors.phone ? (
-                            <p className='text-destructive text-sm' id='checkout-phone-error' role='alert'>
-                                {errors.phone}
-                            </p>
-                        ) : null}
-                    </div>
+                    </FormField>
                 </CardContent>
             </Card>
 
@@ -142,33 +102,13 @@ export function CheckoutForm({
                     <CardTitle className='text-base'>Доставка</CardTitle>
                 </CardHeader>
                 <CardContent className='flex min-w-0 flex-col gap-4'>
-                    <fieldset className='flex min-w-0 flex-col gap-2'>
-                        <legend className='mb-1 font-medium text-sm'>Способ доставки</legend>
-                        {options.deliveryMethods.map((item) => {
-                            const id = `delivery-${item.id}`
-                            return (
-                                <label
-                                    className='flex min-w-0 cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors has-checked:border-primary/60 has-checked:bg-primary/5'
-                                    htmlFor={id}
-                                    key={item.id}
-                                >
-                                    <input
-                                        checked={draft.deliveryMethod === item.id}
-                                        className='size-4 shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
-                                        id={id}
-                                        name='deliveryMethod'
-                                        onChange={() => onDraftChange({ deliveryMethod: item.id })}
-                                        type='radio'
-                                        value={item.id}
-                                    />
-                                    <span className='text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70'>
-                                        {item.title}
-                                    </span>
-                                </label>
-                            )
-                        })}
-                    </fieldset>
-
+                    <OptionRadioGroup
+                        legend='Способ доставки'
+                        name='delivery'
+                        onChange={(id) => onDraftChange({ deliveryMethod: id })}
+                        options={options.deliveryMethods.map((item) => ({ id: item.id, title: item.title }))}
+                        value={draft.deliveryMethod}
+                    />
                     <DeliveryFields
                         errors={errors}
                         method={draft.deliveryMethod}
@@ -193,32 +133,13 @@ export function CheckoutForm({
                     <CardTitle className='text-base'>Оплата</CardTitle>
                 </CardHeader>
                 <CardContent className='flex min-w-0 flex-col gap-4'>
-                    <fieldset className='flex min-w-0 flex-col gap-2'>
-                        <legend className='mb-1 font-medium text-sm'>Способ оплаты</legend>
-                        {options.paymentMethods.map((item) => {
-                            const id = `payment-${item.id}`
-                            return (
-                                <label
-                                    className='flex min-w-0 cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors has-checked:border-primary/60 has-checked:bg-primary/5'
-                                    htmlFor={id}
-                                    key={item.id}
-                                >
-                                    <input
-                                        checked={draft.paymentMethod === item.id}
-                                        className='size-4 shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
-                                        id={id}
-                                        name='paymentMethod'
-                                        onChange={() => onDraftChange({ paymentMethod: item.id })}
-                                        type='radio'
-                                        value={item.id}
-                                    />
-                                    <span className='text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70'>
-                                        {item.title}
-                                    </span>
-                                </label>
-                            )
-                        })}
-                    </fieldset>
+                    <OptionRadioGroup
+                        legend='Способ оплаты'
+                        name='payment'
+                        onChange={(id) => onDraftChange({ paymentMethod: id })}
+                        options={options.paymentMethods.map((item) => ({ id: item.id, title: item.title }))}
+                        value={draft.paymentMethod}
+                    />
                 </CardContent>
             </Card>
 

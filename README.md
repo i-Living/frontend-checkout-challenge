@@ -94,7 +94,15 @@ npm run build   # contracts + api
 
 ### HTTP-клиент (D2)
 
-Единая точка настройки соединения — `apps/web/src/shared/api/client.ts`: базовый URL (`VITE_API_URL` / `127.0.0.1:4000`), заголовок `Authorization: Bearer <token>`, заголовок `Idempotency-Key`, разбор JSON/`204`, маппинг ошибок. Рядом: `apps/web/src/shared/api/errors.ts` (тип `ApiError`, перевод кодов в понятный вид), `apps/web/src/shared/api/endpoints.ts` (обёртки над эндпоинтами), `apps/web/src/shared/api/idempotency.ts` (ключи идемпотентности), `apps/web/src/shared/api/query-keys.ts`, `apps/web/src/shared/api/session.ts`. Страницы не копируют fetch-настройку, а используют эти модули.
+Единая точка настройки соединения — `apps/web/src/shared/api/client.ts`: базовый URL (`VITE_API_URL` / `127.0.0.1:4000`), заголовок `Authorization: Bearer <token>`, заголовок `Idempotency-Key`, разбор JSON/`204`, маппинг в `ApiError`. Рядом:
+
+- `errors.ts` — тип `ApiError`, `toUserMessage` / `toErrorTitle` / `getErrorCode` (таблица кодов; страницы не маппят ошибки сами)
+- `endpoints.ts` — обёртки над эндпоинтами; 401 сессии повторяется в одном `withSessionRetry`
+- `queries.ts` — хуки `useCart` / `useProducts` / `useOrder` / … (страницы не задают `queryKey`/`queryFn`)
+- `invalidate.ts` — сброс кэша по сущностям
+- `idempotency.ts`, `query-keys.ts`, `session.ts`
+
+Мутации корзины — `features/cart/use-cart-mutations.ts` (одно правило для каталога и корзины). Экраны загрузки/ошибки — `shared/ui/query-state.tsx`. Страницы не копируют fetch-настройку и не разбирают `ApiError` вручную.
 
 ### Проверенные сценарии (EVALUATION.md)
 

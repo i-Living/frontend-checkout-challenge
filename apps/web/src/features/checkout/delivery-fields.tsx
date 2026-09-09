@@ -3,8 +3,8 @@
  */
 import type { CheckoutOptions } from '@/shared/api/endpoints'
 import type { CheckoutDraft } from '@/shared/store/session-store'
+import { FormField } from '@/shared/ui/form-field'
 import { Input } from '@/shared/ui/input'
-import { Label } from '@/shared/ui/label'
 
 /**
  * Список пунктов выдачи из опций доставки.
@@ -23,11 +23,6 @@ type DeliveryErrors = Partial<Record<'pickupPointId' | 'city' | 'street' | 'hous
 
 /**
  * Пропсы полей доставки.
- * @property method выбранный способ доставки
- * @property pickupPoints список пунктов выдачи для самовывоза
- * @property values текущие значения полей доставки
- * @property errors ошибки валидации полей доставки
- * @property onChange обработчик изменения полей доставки
  */
 interface DeliveryFieldsProps {
     method: string
@@ -39,85 +34,44 @@ interface DeliveryFieldsProps {
 
 /**
  * Поля доставки под выбранный способ: адрес курьера или пункт выдачи.
- * @param method выбранный способ доставки
- * @param pickupPoints список пунктов выдачи для самовывоза
- * @param values текущие значения полей доставки
- * @param errors ошибки валидации полей доставки
- * @param onChange обработчик изменения полей доставки
  */
 export function DeliveryFields({ method, pickupPoints, values, errors, onChange }: DeliveryFieldsProps) {
     if (method === 'courier') {
         return (
             <div className='flex min-w-0 flex-col gap-4'>
-                <div className='flex min-w-0 flex-col gap-1.5'>
-                    <Label htmlFor='checkout-city'>Город</Label>
+                <FormField error={errors.city} id='checkout-city' label='Город'>
                     <Input
-                        aria-describedby={errors.city ? 'checkout-city-error' : undefined}
-                        aria-invalid={Boolean(errors.city)}
                         autoComplete='address-level2'
-                        id='checkout-city'
                         onChange={(event) => onChange({ city: event.target.value })}
                         value={values.city}
                     />
-                    {errors.city ? (
-                        <p className='text-destructive text-sm' id='checkout-city-error' role='alert'>
-                            {errors.city}
-                        </p>
-                    ) : null}
-                </div>
-                <div className='flex min-w-0 flex-col gap-1.5'>
-                    <Label htmlFor='checkout-street'>Улица</Label>
+                </FormField>
+                <FormField error={errors.street} id='checkout-street' label='Улица'>
                     <Input
-                        aria-describedby={errors.street ? 'checkout-street-error' : undefined}
-                        aria-invalid={Boolean(errors.street)}
                         autoComplete='street-address'
-                        id='checkout-street'
                         onChange={(event) => onChange({ street: event.target.value })}
                         value={values.street}
                     />
-                    {errors.street ? (
-                        <p className='text-destructive text-sm' id='checkout-street-error' role='alert'>
-                            {errors.street}
-                        </p>
-                    ) : null}
-                </div>
+                </FormField>
                 <div className='grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2'>
-                    <div className='flex min-w-0 flex-col gap-1.5'>
-                        <Label htmlFor='checkout-house'>Дом</Label>
+                    <FormField error={errors.house} id='checkout-house' label='Дом'>
+                        <Input onChange={(event) => onChange({ house: event.target.value })} value={values.house} />
+                    </FormField>
+                    <FormField id='checkout-apartment' label='Квартира'>
                         <Input
-                            aria-describedby={errors.house ? 'checkout-house-error' : undefined}
-                            aria-invalid={Boolean(errors.house)}
-                            id='checkout-house'
-                            onChange={(event) => onChange({ house: event.target.value })}
-                            value={values.house}
-                        />
-                        {errors.house ? (
-                            <p className='text-destructive text-sm' id='checkout-house-error' role='alert'>
-                                {errors.house}
-                            </p>
-                        ) : null}
-                    </div>
-                    <div className='flex min-w-0 flex-col gap-1.5'>
-                        <Label htmlFor='checkout-apartment'>Квартира</Label>
-                        <Input
-                            id='checkout-apartment'
                             onChange={(event) => onChange({ apartment: event.target.value })}
                             value={values.apartment}
                         />
-                    </div>
+                    </FormField>
                 </div>
             </div>
         )
     }
 
     return (
-        <div className='flex min-w-0 flex-col gap-1.5'>
-            <Label htmlFor='checkout-pickup-point'>Пункт выдачи</Label>
+        <FormField error={errors.pickupPointId} id='checkout-pickup-point' label='Пункт выдачи'>
             <select
-                aria-describedby={errors.pickupPointId ? 'checkout-pickup-point-error' : undefined}
-                aria-invalid={Boolean(errors.pickupPointId)}
                 className='border-input flex h-11 min-h-[44px] w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm'
-                id='checkout-pickup-point'
                 onChange={(event) => onChange({ pickupPointId: event.target.value })}
                 value={values.pickupPointId}
             >
@@ -128,11 +82,6 @@ export function DeliveryFields({ method, pickupPoints, values, errors, onChange 
                     </option>
                 ))}
             </select>
-            {errors.pickupPointId ? (
-                <p className='text-destructive text-sm' id='checkout-pickup-point-error' role='alert'>
-                    {errors.pickupPointId}
-                </p>
-            ) : null}
-        </div>
+        </FormField>
     )
 }

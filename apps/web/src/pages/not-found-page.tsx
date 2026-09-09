@@ -1,8 +1,8 @@
 /**
  * Страница 404: неизвестный адрес.
  */
-import { useEffect } from 'react'
 import { Link } from 'react-router'
+import { usePageTitle } from '@/shared/lib/use-page-title'
 import { Button } from '@/shared/ui/button'
 
 /**
@@ -10,9 +10,7 @@ import { Button } from '@/shared/ui/button'
  * @returns Разметка страницы 404
  */
 export function NotFoundPage() {
-    useEffect(() => {
-        document.title = 'Страница не найдена — Магазин'
-    }, [])
+    usePageTitle('Страница не найдена')
     return (
         <div>
             <h1 className='mb-2 font-semibold text-2xl tracking-tight'>Страница не найдена</h1>

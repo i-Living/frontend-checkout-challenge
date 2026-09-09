@@ -2,33 +2,39 @@
  * Экран корзины (`/cart`).
  * Отвечает за строки корзины, смену количества, удаление, итог и переход к оформлению.
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, CircleAlert, ShoppingBasket } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { ArrowRight, ShoppingBasket } from 'lucide-react'
+import { useMemo } from 'react'
 import { Link } from 'react-router'
 import { CartLine } from '@/features/cart/cart-line'
-import { getCart, listProducts, removeCartItem, setCartItem } from '@/shared/api/endpoints'
-import { isApiError } from '@/shared/api/errors'
-import { keys } from '@/shared/api/query-keys'
+import { useRemoveCartItem, useSetCartItem } from '@/features/cart/use-cart-mutations'
+import { useCart, useProducts } from '@/shared/api/queries'
 import { formatMoney } from '@/shared/lib/money'
 import { pluralize } from '@/shared/lib/pluralize'
-import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
+import { usePageTitle } from '@/shared/lib/use-page-title'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/shared/ui/card'
+import { MutationAlert } from '@/shared/ui/mutation-alert'
+import { queryGate } from '@/shared/ui/query-gate'
 import { Skeleton } from '@/shared/ui/skeleton'
 
-interface SetQuantityVariables {
-    productId: string
-    quantity: number
-}
-
 /**
- * Превращает ошибку мутации корзины в текст для алерта.
- * @param error Ошибка мутации
- * @returns Текст сообщения пользователю
+ * Скелетон списка корзины.
  */
-function toMutationMessage(error: unknown): string {
-    return isApiError(error) ? error.message : 'Попробуйте ещё раз.'
+function CartSkeleton() {
+    return (
+        <div className='flex flex-col gap-3' role='status'>
+            {[0, 1].map((index) => (
+                <div className='flex min-w-0 flex-wrap items-center gap-3 rounded-xl border p-4' key={index}>
+                    <div className='min-w-0 flex-1 basis-48'>
+                        <Skeleton className='h-5 w-2/3' />
+                        <Skeleton className='mt-2 h-4 w-1/3' />
+                    </div>
+                    <Skeleton className='h-9 w-32' />
+                    <Skeleton className='h-5 w-20' />
+                </div>
+            ))}
+        </div>
+    )
 }
 
 /**
@@ -37,96 +43,27 @@ function toMutationMessage(error: unknown): string {
  * @returns Разметка страницы корзины
  */
 export function CartPage() {
-    const queryClient = useQueryClient()
-    const cartQuery = useQuery({
-        queryKey: keys.cart,
-        queryFn: ({ signal }) => getCart(signal),
-    })
-    // Остатки для ограничения количества в строках корзины.
-    const productsQuery = useQuery({
-        queryKey: keys.products,
-        queryFn: ({ signal }) => listProducts(signal),
-    })
+    usePageTitle('Корзина')
+    const cartQuery = useCart()
+    const productsQuery = useProducts()
+    const setQuantityMutation = useSetCartItem()
+    const removeMutation = useRemoveCartItem()
     const stockById = useMemo(
         () => new Map((productsQuery.data ?? []).map((product) => [product.id, product.stock] as const)),
         [productsQuery.data],
     )
-    const setQuantityMutation = useMutation({
-        mutationFn: ({ productId, quantity }: SetQuantityVariables) => setCartItem(productId, quantity),
-        onSuccess: () => {
-            void queryClient.invalidateQueries({ queryKey: keys.cart })
-        },
-        onError: (error: unknown) => {
-            if (!isApiError(error)) {
-                return
-            }
-            if (error.code === 'INSUFFICIENT_STOCK') {
-                void queryClient.invalidateQueries({ queryKey: keys.cart })
-                void queryClient.invalidateQueries({ queryKey: keys.products })
-            } else if (error.code === 'CART_ITEM_NOT_FOUND') {
-                void queryClient.invalidateQueries({ queryKey: keys.cart })
-            }
-        },
+
+    const blocked = queryGate(cartQuery, {
+        title: 'Корзина',
+        errorTitle: 'Не удалось загрузить корзину',
+        skeleton: <CartSkeleton />,
     })
-    const removeMutation = useMutation({
-        mutationFn: (productId: string) => removeCartItem(productId),
-        onSuccess: () => {
-            void queryClient.invalidateQueries({ queryKey: keys.cart })
-        },
-        onError: (error: unknown) => {
-            if (isApiError(error) && error.code === 'CART_ITEM_NOT_FOUND') {
-                void queryClient.invalidateQueries({ queryKey: keys.cart })
-            }
-        },
-    })
-
-    useEffect(() => {
-        document.title = 'Корзина — Магазин'
-    }, [])
-
-    if (cartQuery.isPending) {
-        return (
-            <div aria-busy='true'>
-                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Корзина</h1>
-                <div className='flex flex-col gap-3' role='status'>
-                    {[0, 1].map((index) => (
-                        <div className='flex min-w-0 flex-wrap items-center gap-3 rounded-xl border p-4' key={index}>
-                            <div className='min-w-0 flex-1 basis-48'>
-                                <Skeleton className='h-5 w-2/3' />
-                                <Skeleton className='mt-2 h-4 w-1/3' />
-                            </div>
-                            <Skeleton className='h-9 w-32' />
-                            <Skeleton className='h-5 w-20' />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )
-    }
-
-    if (cartQuery.isError) {
-        return (
-            <div>
-                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Корзина</h1>
-                <Alert variant='destructive'>
-                    <CircleAlert />
-                    <AlertTitle>Не удалось загрузить корзину</AlertTitle>
-                    <AlertDescription>
-                        {isApiError(cartQuery.error) ? cartQuery.error.message : 'Попробуйте ещё раз.'}
-                    </AlertDescription>
-                </Alert>
-                <Button className='mt-4 w-full sm:w-auto' onClick={() => void cartQuery.refetch()} type='button'>
-                    Повторить
-                </Button>
-            </div>
-        )
+    if (blocked) {
+        return blocked
     }
 
     const cart = cartQuery.data
-    const mutationError = setQuantityMutation.error ?? removeMutation.error
-    const isMutating = setQuantityMutation.isPending || removeMutation.isPending
-
-    if (cart.items.length === 0) {
+    if (!cart || cart.items.length === 0) {
         return (
             <div>
                 <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Корзина</h1>
@@ -150,6 +87,9 @@ export function CartPage() {
         )
     }
 
+    const mutationError = setQuantityMutation.error ?? removeMutation.error
+    const isMutating = setQuantityMutation.isPending || removeMutation.isPending
+
     return (
         <div>
             <div className='mb-4 flex min-w-0 flex-wrap items-baseline gap-x-3'>
@@ -158,13 +98,7 @@ export function CartPage() {
                     {cart.quantity} {pluralize(cart.quantity, 'товар', 'товара', 'товаров')}
                 </p>
             </div>
-            {mutationError !== null && (
-                <Alert className='mb-4' variant='destructive'>
-                    <CircleAlert />
-                    <AlertTitle>Не удалось обновить корзину</AlertTitle>
-                    <AlertDescription>{toMutationMessage(mutationError)}</AlertDescription>
-                </Alert>
-            )}
+            <MutationAlert className='mb-4' error={mutationError} title='Не удалось обновить корзину' />
             <div className='grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_320px]'>
                 <Card className='min-w-0 overflow-hidden py-0'>
                     <CardContent className='min-w-0 divide-y p-0'>
