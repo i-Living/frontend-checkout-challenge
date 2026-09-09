@@ -31,13 +31,23 @@ export function CardPicker({ cards, selectedId, onSelect, disabled = false }: Ca
         <RadioGroup aria-label='Тестовая карта' disabled={disabled} onValueChange={onSelect} value={selectedId ?? ''}>
             {cards.map((card) => {
                 const id = `card-${card.id}`
+                const selected = selectedId === card.id
                 return (
-                    <div className='flex min-w-0 items-center gap-2' key={card.id}>
+                    <div
+                        className={
+                            selected
+                                ? 'flex min-w-0 items-center gap-3 rounded-xl border border-primary/60 bg-primary/5 p-3.5 transition-colors'
+                                : 'flex min-w-0 items-center gap-3 rounded-xl border p-3.5 transition-colors hover:bg-muted/40'
+                        }
+                        key={card.id}
+                    >
                         <RadioGroupItem disabled={disabled} id={id} value={card.id} />
                         <Label className='min-w-0 flex-1 cursor-pointer' htmlFor={id}>
                             <span className='flex min-w-0 flex-wrap items-baseline justify-between gap-2'>
-                                <span>{card.title}</span>
-                                <span className='text-muted-foreground'>{card.maskedNumber}</span>
+                                <span className='font-medium'>{card.title}</span>
+                                <span className='font-mono text-muted-foreground text-sm tabular-nums'>
+                                    {card.maskedNumber}
+                                </span>
                             </span>
                         </Label>
                     </div>

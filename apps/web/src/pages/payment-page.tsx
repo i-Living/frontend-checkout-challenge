@@ -24,6 +24,7 @@ import { keys } from '@/shared/api/query-keys'
 import { useSessionStore } from '@/shared/store/session-store'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { Button } from '@/shared/ui/button'
+import { Card, CardContent } from '@/shared/ui/card'
 import { Skeleton } from '@/shared/ui/skeleton'
 
 interface AttemptVariables {
@@ -177,7 +178,7 @@ export function PaymentPage() {
         if (recoveryOrdersQuery.isPending) {
             return (
                 <div>
-                    <h1 className='mb-4 font-semibold text-xl'>Оплата заказа</h1>
+                    <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
                     <div className='flex min-w-0 flex-col gap-3'>
                         <Skeleton className='h-11 w-full' />
                         <Skeleton className='h-11 w-full' />
@@ -189,7 +190,7 @@ export function PaymentPage() {
         if (recoveryOrdersQuery.isError) {
             return (
                 <div>
-                    <h1 className='mb-4 font-semibold text-xl'>Оплата заказа</h1>
+                    <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
                     <Alert variant='destructive'>
                         <CircleAlert />
                         <AlertTitle>Не удалось загрузить заказ</AlertTitle>
@@ -215,7 +216,7 @@ export function PaymentPage() {
     if (orderQuery.isPending) {
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Оплата заказа</h1>
+                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
                 <div className='flex min-w-0 flex-col gap-3'>
                     <Skeleton className='h-11 w-full' />
                     <Skeleton className='h-11 w-full' />
@@ -228,7 +229,7 @@ export function PaymentPage() {
     if (orderQuery.isError) {
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Оплата заказа</h1>
+                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
                 <Alert variant='destructive'>
                     <CircleAlert />
                     <AlertTitle>Не удалось загрузить заказ</AlertTitle>
@@ -262,7 +263,7 @@ export function PaymentPage() {
     if (sandboxQuery.isPending) {
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Оплата заказа</h1>
+                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
                 <div className='flex min-w-0 flex-col gap-3'>
                     <Skeleton className='h-11 w-full' />
                     <Skeleton className='h-11 w-full' />
@@ -275,7 +276,7 @@ export function PaymentPage() {
     if (sandboxQuery.isError) {
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Оплата заказа</h1>
+                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
                 <Alert variant='destructive'>
                     <CircleAlert />
                     <AlertTitle>Не удалось загрузить тестовые карты</AlertTitle>
@@ -337,112 +338,116 @@ export function PaymentPage() {
 
     return (
         <div>
-            <h1 className='mb-4 font-semibold text-xl'>Оплата заказа</h1>
-            <p className='mb-4 text-muted-foreground text-sm'>Заказ {order.number}</p>
-            <div className='flex min-w-0 max-w-xl flex-col gap-4'>
-                <CardPicker
-                    cards={sandboxCards}
-                    disabled={isProcessing}
-                    onSelect={setSelectedCardId}
-                    selectedId={selectedCardId}
-                />
-                {isProcessing ? (
-                    <p aria-live='polite' className='flex min-w-0 items-center gap-2 text-sm'>
-                        <LoaderCircle aria-hidden className='size-4 shrink-0 animate-spin' />
-                        Обрабатываем оплату…
-                    </p>
-                ) : null}
-                {payment ? (
-                    <p aria-live='polite' className='text-muted-foreground text-sm'>
-                        Статус оплаты: {payment.status}
-                        {payment.failureCode ? ` (${payment.failureCode})` : ''}
-                    </p>
-                ) : null}
-                {isDeclined ? (
-                    <Alert variant='destructive'>
-                        <CircleAlert />
-                        <AlertTitle>Банк отклонил карту</AlertTitle>
-                        <AlertDescription>
-                            Заказ сохранён в статусе awaiting_payment, деньги не списаны. Нажмите «Оплатить снова»,
-                            чтобы создать новую попытку.
-                        </AlertDescription>
-                    </Alert>
-                ) : null}
-                {isCancelled ? (
-                    <Alert>
-                        <Info />
-                        <AlertTitle>Оплата отменена</AlertTitle>
-                        <AlertDescription>
-                            Заказ сохранён. Нажмите «Оплатить снова», чтобы создать новую попытку.
-                        </AlertDescription>
-                    </Alert>
-                ) : null}
-                {showInProgress ? (
-                    <Alert>
-                        <LoaderCircle />
-                        <AlertTitle>Оплата уже выполняется</AlertTitle>
-                        <AlertDescription>Показана текущая попытка, продолжаем опрос.</AlertDescription>
-                    </Alert>
-                ) : null}
-                {showFinalized ? (
-                    <Alert variant='destructive'>
-                        <CircleAlert />
-                        <AlertTitle>Оплата уже завершена</AlertTitle>
-                        <AlertDescription>
-                            Сценарий не меняем. Нажмите «Оплатить снова», чтобы создать новую попытку.
-                        </AlertDescription>
-                    </Alert>
-                ) : null}
-                {showGenericPayError ? (
-                    <Alert variant='destructive'>
-                        <CircleAlert />
-                        <AlertTitle>Не удалось оплатить</AlertTitle>
-                        <AlertDescription>{toErrorMessage(mutationError)}</AlertDescription>
-                    </Alert>
-                ) : null}
-                {showGenericCancelError ? (
-                    <Alert variant='destructive'>
-                        <CircleAlert />
-                        <AlertTitle>Не удалось отменить</AlertTitle>
-                        <AlertDescription>{toErrorMessage(cancelMutation.error)}</AlertDescription>
-                    </Alert>
-                ) : null}
-                <div className='flex min-w-0 flex-wrap gap-2'>
-                    {showRetry ? (
+            <h1 className='mb-1 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
+            <p className='mb-5 text-muted-foreground text-sm'>
+                Заказ {order.number} · тестовая оплата, деньги не списываются
+            </p>
+            <Card className='min-w-0 max-w-xl'>
+                <CardContent className='flex min-w-0 flex-col gap-4 pt-6'>
+                    <CardPicker
+                        cards={sandboxCards}
+                        disabled={isProcessing}
+                        onSelect={setSelectedCardId}
+                        selectedId={selectedCardId}
+                    />
+                    {isProcessing ? (
+                        <p aria-live='polite' className='flex min-w-0 items-center gap-2 text-sm'>
+                            <LoaderCircle aria-hidden className='size-4 shrink-0 animate-spin' />
+                            Обрабатываем оплату…
+                        </p>
+                    ) : null}
+                    {payment ? (
+                        <p aria-live='polite' className='text-muted-foreground text-sm'>
+                            Статус оплаты: {payment.status}
+                            {payment.failureCode ? ` (${payment.failureCode})` : ''}
+                        </p>
+                    ) : null}
+                    {isDeclined ? (
+                        <Alert variant='destructive'>
+                            <CircleAlert />
+                            <AlertTitle>Банк отклонил карту</AlertTitle>
+                            <AlertDescription>
+                                Заказ сохранён в статусе awaiting_payment, деньги не списаны. Нажмите «Оплатить снова»,
+                                чтобы создать новую попытку.
+                            </AlertDescription>
+                        </Alert>
+                    ) : null}
+                    {isCancelled ? (
+                        <Alert>
+                            <Info />
+                            <AlertTitle>Оплата отменена</AlertTitle>
+                            <AlertDescription>
+                                Заказ сохранён. Нажмите «Оплатить снова», чтобы создать новую попытку.
+                            </AlertDescription>
+                        </Alert>
+                    ) : null}
+                    {showInProgress ? (
+                        <Alert>
+                            <LoaderCircle />
+                            <AlertTitle>Оплата уже выполняется</AlertTitle>
+                            <AlertDescription>Показана текущая попытка, продолжаем опрос.</AlertDescription>
+                        </Alert>
+                    ) : null}
+                    {showFinalized ? (
+                        <Alert variant='destructive'>
+                            <CircleAlert />
+                            <AlertTitle>Оплата уже завершена</AlertTitle>
+                            <AlertDescription>
+                                Сценарий не меняем. Нажмите «Оплатить снова», чтобы создать новую попытку.
+                            </AlertDescription>
+                        </Alert>
+                    ) : null}
+                    {showGenericPayError ? (
+                        <Alert variant='destructive'>
+                            <CircleAlert />
+                            <AlertTitle>Не удалось оплатить</AlertTitle>
+                            <AlertDescription>{toErrorMessage(mutationError)}</AlertDescription>
+                        </Alert>
+                    ) : null}
+                    {showGenericCancelError ? (
+                        <Alert variant='destructive'>
+                            <CircleAlert />
+                            <AlertTitle>Не удалось отменить</AlertTitle>
+                            <AlertDescription>{toErrorMessage(cancelMutation.error)}</AlertDescription>
+                        </Alert>
+                    ) : null}
+                    <div className='flex min-w-0 flex-wrap gap-2'>
+                        {showRetry ? (
+                            <Button
+                                className='w-full sm:w-auto'
+                                disabled={isProcessing || !selectedCard}
+                                onClick={handlePay}
+                                type='button'
+                            >
+                                Оплатить снова
+                            </Button>
+                        ) : (
+                            <Button
+                                className='w-full sm:w-auto'
+                                disabled={isProcessing || !selectedCard}
+                                onClick={handlePay}
+                                type='button'
+                            >
+                                Оплатить
+                            </Button>
+                        )}
                         <Button
                             className='w-full sm:w-auto'
-                            disabled={isProcessing || !selectedCard}
-                            onClick={handlePay}
+                            disabled={
+                                !effectivePaymentId || payMutation.isPending || cancelMutation.isPending || isTerminal
+                            }
+                            onClick={handleCancel}
                             type='button'
+                            variant='outline'
                         >
-                            Оплатить снова
+                            Отменить оплату
                         </Button>
-                    ) : (
-                        <Button
-                            className='w-full sm:w-auto'
-                            disabled={isProcessing || !selectedCard}
-                            onClick={handlePay}
-                            type='button'
-                        >
-                            Оплатить
-                        </Button>
-                    )}
-                    <Button
-                        className='w-full sm:w-auto'
-                        disabled={
-                            !effectivePaymentId || payMutation.isPending || cancelMutation.isPending || isTerminal
-                        }
-                        onClick={handleCancel}
-                        type='button'
-                        variant='outline'
-                    >
-                        Отменить оплату
+                    </div>
+                    <Button asChild className='w-fit' variant='link'>
+                        <Link to={`/orders/${orderId}`}>К заказу</Link>
                     </Button>
-                </div>
-                <Button asChild className='w-fit' variant='link'>
-                    <Link to={`/orders/${orderId}`}>К заказу</Link>
-                </Button>
-            </div>
+                </CardContent>
+            </Card>
         </div>
     )
 }

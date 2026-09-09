@@ -31,7 +31,7 @@ export function OrderPage() {
     if (!orderId) {
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Заказ</h1>
+                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Заказ</h1>
                 <Alert variant='destructive'>
                     <CircleAlert />
                     <AlertTitle>Не удалось загрузить заказ</AlertTitle>
@@ -47,7 +47,7 @@ export function OrderPage() {
     if (orderQuery.isPending) {
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Заказ</h1>
+                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Заказ</h1>
                 <div className='flex min-w-0 max-w-xl flex-col gap-3'>
                     <Skeleton className='h-5 w-1/3' />
                     <Skeleton className='h-4 w-full' />
@@ -61,7 +61,7 @@ export function OrderPage() {
     if (orderQuery.isError) {
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Заказ</h1>
+                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Заказ</h1>
                 <Alert variant='destructive'>
                     <CircleAlert />
                     <AlertTitle>Не удалось загрузить заказ</AlertTitle>
@@ -85,10 +85,15 @@ export function OrderPage() {
     if (isCardSuccess) {
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Заказ оплачен</h1>
-                <Card className='min-w-0 max-w-xl'>
-                    <CardContent className='flex min-w-0 flex-col gap-4 pt-6'>
-                        <CircleCheck aria-hidden className='size-6 shrink-0 text-green-600 dark:text-green-500' />
+                <Card className='min-w-0 max-w-xl gap-0 overflow-hidden py-0'>
+                    <div className='bg-green-600/10 px-6 pt-6 pb-5 dark:bg-green-500/10'>
+                        <span className='flex size-12 items-center justify-center rounded-full bg-green-600 text-white dark:bg-green-500 dark:text-green-950'>
+                            <CircleCheck aria-hidden className='size-6' />
+                        </span>
+                        <h1 className='mt-3 font-semibold text-2xl tracking-tight'>Заказ оплачен</h1>
+                        <p className='text-muted-foreground text-sm'>Спасибо за покупку! Детали заказа ниже.</p>
+                    </div>
+                    <CardContent className='pt-5 pb-6'>
                         <OrderSummary order={order} />
                     </CardContent>
                 </Card>
@@ -99,10 +104,17 @@ export function OrderPage() {
     if (isCashSuccess) {
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Заказ оформлен, оплата при получении</h1>
-                <Card className='min-w-0 max-w-xl'>
-                    <CardContent className='flex min-w-0 flex-col gap-4 pt-6'>
-                        <CircleCheck aria-hidden className='size-6 shrink-0 text-green-600 dark:text-green-500' />
+                <Card className='min-w-0 max-w-xl gap-0 overflow-hidden py-0'>
+                    <div className='bg-green-600/10 px-6 pt-6 pb-5 dark:bg-green-500/10'>
+                        <span className='flex size-12 items-center justify-center rounded-full bg-green-600 text-white dark:bg-green-500 dark:text-green-950'>
+                            <CircleCheck aria-hidden className='size-6' />
+                        </span>
+                        <h1 className='mt-3 font-semibold text-2xl tracking-tight'>
+                            Заказ оформлен, оплата при получении
+                        </h1>
+                        <p className='text-muted-foreground text-sm'>Детали заказа ниже.</p>
+                    </div>
+                    <CardContent className='pt-5 pb-6'>
                         <OrderSummary order={order} />
                     </CardContent>
                 </Card>
@@ -113,7 +125,7 @@ export function OrderPage() {
     if (order.status === 'awaiting_payment' && order.paymentStatus === 'pending') {
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Заказ</h1>
+                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Заказ</h1>
                 <p aria-live='polite' className='flex min-w-0 items-center gap-2 text-sm'>
                     <LoaderCircle aria-hidden className='size-4 shrink-0 animate-spin' />
                     Оплата ещё обрабатывается
@@ -131,7 +143,7 @@ export function OrderPage() {
     ) {
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Заказ</h1>
+                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Заказ</h1>
                 <div className='min-w-0 max-w-xl'>
                     <OrderSummary order={order} />
                 </div>
@@ -144,7 +156,7 @@ export function OrderPage() {
 
     return (
         <div>
-            <h1 className='mb-4 font-semibold text-xl'>Заказ</h1>
+            <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Заказ</h1>
             <div className='min-w-0 max-w-xl'>
                 <OrderSummary order={order} />
             </div>

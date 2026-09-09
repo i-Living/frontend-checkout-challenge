@@ -329,7 +329,7 @@ export function CheckoutPage() {
     if (cartQuery.isPending || optionsQuery.isPending) {
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Оформление заказа</h1>
+                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оформление заказа</h1>
                 <div className='grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]'>
                     <div className='flex min-w-0 flex-col gap-4'>
                         <Skeleton className='h-11 w-full' />
@@ -347,7 +347,7 @@ export function CheckoutPage() {
         const error = cartQuery.isError ? cartQuery.error : optionsQuery.error
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Оформление заказа</h1>
+                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оформление заказа</h1>
                 <Alert variant='destructive'>
                     <CircleAlert />
                     <AlertTitle>Не удалось загрузить оформление</AlertTitle>
@@ -385,7 +385,7 @@ export function CheckoutPage() {
 
     return (
         <div>
-            <h1 className='mb-4 font-semibold text-xl'>Оформление заказа</h1>
+            <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оформление заказа</h1>
             <div className='grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]'>
                 <div className='min-w-0'>
                     {createOrderMutation.isError ? (

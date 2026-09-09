@@ -60,7 +60,7 @@ export function CartLine({ item, onQuantity, onRemove, isPending }: CartLineProp
     }
 
     return (
-        <div className='flex min-w-0 flex-wrap items-center gap-3 rounded-xl border p-4'>
+        <div className='flex min-w-0 flex-wrap items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/40 sm:px-5'>
             <div className='min-w-0 flex-1 basis-48'>
                 <p className='truncate font-medium'>{item.title}</p>
                 <p className='text-muted-foreground text-sm'>{formatMoney(item.unitPrice)} / шт.</p>

@@ -39,17 +39,21 @@ export function ProductCard({ product, quantityInCart, onAdd, onQuantity, onRemo
     const outOfStock = product.stock === 0
     const inCart = quantityInCart > 0
     return (
-        <Card className='flex min-w-0 flex-col'>
+        <Card className='group flex min-w-0 flex-col overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-lg'>
             <CardHeader className='min-w-0'>
-                <CardTitle className='min-w-0'>{product.title}</CardTitle>
-                <CardDescription className='min-w-0'>{product.description}</CardDescription>
+                <CardTitle className='min-w-0 text-base leading-snug'>{product.title}</CardTitle>
+                <CardDescription className='min-w-0 line-clamp-2'>{product.description}</CardDescription>
             </CardHeader>
-            <CardContent className='flex min-w-0 flex-wrap items-baseline justify-between gap-2'>
-                <span className='font-semibold'>{formatMoney(product.price)}</span>
+            <CardContent className='flex min-w-0 flex-wrap items-center justify-between gap-2'>
+                <span className='font-semibold text-lg tabular-nums tracking-tight'>{formatMoney(product.price)}</span>
                 {outOfStock ? (
-                    <span className='text-muted-foreground text-sm'>Нет в наличии</span>
+                    <span className='rounded-full bg-muted px-2.5 py-1 font-medium text-muted-foreground text-xs'>
+                        Нет в наличии
+                    </span>
                 ) : (
-                    <span className='text-muted-foreground text-sm'>Остаток: {product.stock} шт.</span>
+                    <span className='rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary text-xs'>
+                        Остаток: {product.stock} шт.
+                    </span>
                 )}
             </CardContent>
             <CardFooter className='mt-auto flex min-w-0 flex-wrap items-center gap-2'>
@@ -64,32 +68,36 @@ export function ProductCard({ product, quantityInCart, onAdd, onQuantity, onRemo
                         {isPending ? 'Добавляем…' : 'В корзину'}
                     </Button>
                 ) : (
-                    <div className='flex min-w-0 flex-wrap items-center gap-2'>
+                    <div className='flex min-w-0 flex-wrap items-center gap-1.5 rounded-full bg-muted/60 p-1 pr-2'>
                         <Button
                             aria-label={`Уменьшить количество «${product.title}»`}
+                            className='size-8 min-h-8 rounded-full'
                             disabled={isPending || quantityInCart <= 1}
                             onClick={() => onQuantity(quantityInCart - 1)}
                             size='icon'
                             type='button'
-                            variant='outline'
+                            variant='ghost'
                         >
                             <Minus aria-hidden='true' />
                         </Button>
-                        <span aria-live='polite' className='min-w-8 text-center font-medium'>
+                        <span aria-live='polite' className='min-w-6 text-center font-semibold text-sm tabular-nums'>
                             {quantityInCart}
                         </span>
                         <Button
                             aria-label={`Увеличить количество «${product.title}»`}
+                            className='size-8 min-h-8 rounded-full'
                             disabled={isPending || quantityInCart >= product.stock}
                             onClick={() => onQuantity(quantityInCart + 1)}
                             size='icon'
                             type='button'
-                            variant='outline'
+                            variant='ghost'
                         >
                             <Plus aria-hidden='true' />
                         </Button>
+                        <span className='mx-1 h-4 w-px bg-border' />
                         <Button
                             aria-label={`Удалить «${product.title}» из корзины`}
+                            className='size-8 min-h-8 rounded-full text-muted-foreground hover:text-destructive'
                             disabled={isPending}
                             onClick={onRemove}
                             size='icon'

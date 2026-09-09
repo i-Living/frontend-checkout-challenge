@@ -1,13 +1,14 @@
-/**
+﻿/**
  * Экран каталога (`/`).
  * Список товаров со степпером количества и удалением прямо в карточке.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CircleAlert } from 'lucide-react'
+import { CircleAlert, ShoppingBag } from 'lucide-react'
 import { ProductCard } from '@/features/catalog/product-card'
 import { getCart, listProducts, type Product, removeCartItem, setCartItem } from '@/shared/api/endpoints'
 import { isApiError } from '@/shared/api/errors'
 import { keys } from '@/shared/api/query-keys'
+import { pluralize } from '@/shared/lib/pluralize'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { Button } from '@/shared/ui/button'
 import { Skeleton } from '@/shared/ui/skeleton'
@@ -85,7 +86,7 @@ export function CatalogPage() {
     if (productsQuery.isPending) {
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Каталог</h1>
+                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Каталог</h1>
                 <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3'>
                     {[0, 1, 2, 3].map((index) => (
                         <div className='flex min-w-0 flex-col gap-2 rounded-xl border p-6' key={index}>
@@ -103,7 +104,7 @@ export function CatalogPage() {
     if (productsQuery.isError) {
         return (
             <div>
-                <h1 className='mb-4 font-semibold text-xl'>Каталог</h1>
+                <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Каталог</h1>
                 <Alert variant='destructive'>
                     <CircleAlert />
                     <AlertTitle>Не удалось загрузить каталог</AlertTitle>
@@ -124,7 +125,17 @@ export function CatalogPage() {
     const isCartPending = setItemMutation.isPending || removeMutation.isPending
     return (
         <div>
-            <h1 className='mb-4 font-semibold text-xl'>Каталог</h1>
+            <div className='mb-6 flex min-w-0 items-center gap-3'>
+                <span className='flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary'>
+                    <ShoppingBag aria-hidden='true' className='size-5' />
+                </span>
+                <div className='min-w-0'>
+                    <h1 className='font-semibold text-2xl tracking-tight'>Каталог</h1>
+                    <p className='text-muted-foreground text-sm'>
+                        {productsQuery.data.length} {pluralize(productsQuery.data.length, 'товар', 'товара', 'товаров')}
+                    </p>
+                </div>
+            </div>
             {setItemMutation.isError || removeMutation.isError ? (
                 <Alert className='mb-4' variant='destructive'>
                     <CircleAlert />
