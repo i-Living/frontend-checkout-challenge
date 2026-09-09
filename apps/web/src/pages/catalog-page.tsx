@@ -4,6 +4,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, ShoppingBag } from 'lucide-react'
+import { useEffect } from 'react'
 import { ProductCard } from '@/features/catalog/product-card'
 import { getCart, listProducts, type Product, removeCartItem, setCartItem } from '@/shared/api/endpoints'
 import { isApiError } from '@/shared/api/errors'
@@ -37,6 +38,9 @@ export function CatalogPage() {
         mutationFn: ({ productId, quantity }: SetCartItemVariables) => setCartItem(productId, quantity),
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: keys.cart })
+            // Остаток в карточках считается сервером: обновляем каталог,
+            // чтобы бейдж «Остаток» не протухал после изменения корзины.
+            void queryClient.invalidateQueries({ queryKey: keys.products })
         },
         onError: (error: unknown) => {
             if (isApiError(error) && error.code === 'INSUFFICIENT_STOCK') {
@@ -50,8 +54,13 @@ export function CatalogPage() {
         mutationFn: ({ productId }: { productId: string }) => removeCartItem(productId),
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: keys.cart })
+            void queryClient.invalidateQueries({ queryKey: keys.products })
         },
     })
+
+    useEffect(() => {
+        document.title = 'Каталог — Магазин'
+    }, [])
 
     /**
      * Добавляет единицу товара к текущему количеству в корзине.
@@ -85,9 +94,9 @@ export function CatalogPage() {
 
     if (productsQuery.isPending) {
         return (
-            <div>
+            <div aria-busy='true'>
                 <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Каталог</h1>
-                <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3'>
+                <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3' role='status'>
                     {[0, 1, 2, 3].map((index) => (
                         <div className='flex min-w-0 flex-col gap-2 rounded-xl border p-6' key={index}>
                             <Skeleton className='h-5 w-2/3' />

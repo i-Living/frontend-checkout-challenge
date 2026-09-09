@@ -4,6 +4,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { getPayment, type Payment } from '@/shared/api/endpoints'
 import { keys } from '@/shared/api/query-keys'
+import { orThrow } from '@/shared/lib/assert'
 
 /**
  * Терминальные статусы платежа, при которых опрос останавливается.
@@ -34,20 +35,26 @@ interface PaymentPollResult {
 }
 
 /**
- * Опрашивает статус платежа каждые 800 мс до терминального состояния.
+ * Опрашивает статус платежа до терминального состояния.
  * @param paymentId id платежа или пустое значение
  * @param enabled разрешен ли опрос
+ * @param intervalMs пауза между опросами (по умолчанию 800; после simulations
+ * подставляется серверный Retry-After)
  * @returns текущий платеж и флаг терминального состояния
  */
-export function usePaymentPoll(paymentId: string | null | undefined, enabled = true): PaymentPollResult {
+export function usePaymentPoll(
+    paymentId: string | null | undefined,
+    enabled = true,
+    intervalMs = 800,
+): PaymentPollResult {
     const pollQuery = useQuery({
         queryKey: keys.payment(paymentId ?? undefined),
-        queryFn: ({ signal }) => getPayment(paymentId as string, signal),
+        queryFn: ({ signal }) => getPayment(orThrow(paymentId ?? undefined, 'paymentId'), signal),
         enabled: Boolean(paymentId) && enabled,
         refetchInterval: (query) => {
             const status = query.state.data?.status
             if (status === 'pending' || status === 'processing') {
-                return 800
+                return intervalMs
             }
             return false
         },

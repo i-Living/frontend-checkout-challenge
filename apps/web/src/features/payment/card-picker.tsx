@@ -2,6 +2,7 @@
  * Выбор тестовой карты для оплаты заказа.
  */
 import type { Sandbox } from '@/shared/api/endpoints'
+import { cn } from '@/shared/lib/cn'
 import { Label } from '@/shared/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/shared/ui/radio-group'
 
@@ -34,11 +35,10 @@ export function CardPicker({ cards, selectedId, onSelect, disabled = false }: Ca
                 const selected = selectedId === card.id
                 return (
                     <div
-                        className={
-                            selected
-                                ? 'flex min-w-0 items-center gap-3 rounded-xl border border-primary/60 bg-primary/5 p-3.5 transition-colors'
-                                : 'flex min-w-0 items-center gap-3 rounded-xl border p-3.5 transition-colors hover:bg-muted/40'
-                        }
+                        className={cn(
+                            'flex min-w-0 items-center gap-3 rounded-xl border p-3.5 transition-colors',
+                            selected ? 'border-primary/60 bg-primary/5' : 'hover:bg-muted/40',
+                        )}
                         key={card.id}
                     >
                         <RadioGroupItem disabled={disabled} id={id} value={card.id} />

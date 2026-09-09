@@ -83,6 +83,7 @@ export function CheckoutForm({
                     <div className='flex min-w-0 flex-col gap-1.5'>
                         <Label htmlFor='checkout-name'>Имя</Label>
                         <Input
+                            aria-describedby={errors.name ? 'checkout-name-error' : undefined}
                             aria-invalid={Boolean(errors.name)}
                             autoComplete='name'
                             id='checkout-name'
@@ -90,7 +91,7 @@ export function CheckoutForm({
                             value={draft.name}
                         />
                         {errors.name ? (
-                            <p className='text-destructive text-sm' role='alert'>
+                            <p className='text-destructive text-sm' id='checkout-name-error' role='alert'>
                                 {errors.name}
                             </p>
                         ) : null}
@@ -98,6 +99,7 @@ export function CheckoutForm({
                     <div className='flex min-w-0 flex-col gap-1.5'>
                         <Label htmlFor='checkout-email'>Email</Label>
                         <Input
+                            aria-describedby={errors.email ? 'checkout-email-error' : undefined}
                             aria-invalid={Boolean(errors.email)}
                             autoComplete='email'
                             id='checkout-email'
@@ -106,7 +108,7 @@ export function CheckoutForm({
                             value={draft.email}
                         />
                         {errors.email ? (
-                            <p className='text-destructive text-sm' role='alert'>
+                            <p className='text-destructive text-sm' id='checkout-email-error' role='alert'>
                                 {errors.email}
                             </p>
                         ) : null}
@@ -114,6 +116,7 @@ export function CheckoutForm({
                     <div className='flex min-w-0 flex-col gap-1.5'>
                         <Label htmlFor='checkout-phone'>Телефон</Label>
                         <Input
+                            aria-describedby={errors.phone ? 'checkout-phone-error' : undefined}
                             aria-invalid={Boolean(errors.phone)}
                             autoComplete='tel'
                             id='checkout-phone'
@@ -123,7 +126,7 @@ export function CheckoutForm({
                             value={draft.phone}
                         />
                         {errors.phone ? (
-                            <p className='text-destructive text-sm' role='alert'>
+                            <p className='text-destructive text-sm' id='checkout-phone-error' role='alert'>
                                 {errors.phone}
                             </p>
                         ) : null}
@@ -144,11 +147,11 @@ export function CheckoutForm({
                         {options.deliveryMethods.map((item) => {
                             const id = `delivery-${item.id}`
                             return (
-                                <div
+                                <label
                                     className='flex min-w-0 cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors has-checked:border-primary/60 has-checked:bg-primary/5'
+                                    htmlFor={id}
                                     key={item.id}
                                 >
-                                    {' '}
                                     <input
                                         checked={draft.deliveryMethod === item.id}
                                         className='size-4 shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
@@ -158,8 +161,10 @@ export function CheckoutForm({
                                         type='radio'
                                         value={item.id}
                                     />
-                                    <Label htmlFor={id}>{item.title}</Label>
-                                </div>
+                                    <span className='text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70'>
+                                        {item.title}
+                                    </span>
+                                </label>
                             )
                         })}
                     </fieldset>
@@ -193,11 +198,11 @@ export function CheckoutForm({
                         {options.paymentMethods.map((item) => {
                             const id = `payment-${item.id}`
                             return (
-                                <div
+                                <label
                                     className='flex min-w-0 cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors has-checked:border-primary/60 has-checked:bg-primary/5'
+                                    htmlFor={id}
                                     key={item.id}
                                 >
-                                    {' '}
                                     <input
                                         checked={draft.paymentMethod === item.id}
                                         className='size-4 shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
@@ -207,8 +212,10 @@ export function CheckoutForm({
                                         type='radio'
                                         value={item.id}
                                     />
-                                    <Label htmlFor={id}>{item.title}</Label>
-                                </div>
+                                    <span className='text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70'>
+                                        {item.title}
+                                    </span>
+                                </label>
                             )
                         })}
                     </fieldset>

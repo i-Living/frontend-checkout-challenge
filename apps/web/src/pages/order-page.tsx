@@ -4,11 +4,13 @@
  */
 import { useQuery } from '@tanstack/react-query'
 import { CircleAlert, CircleCheck, LoaderCircle } from 'lucide-react'
+import { useEffect } from 'react'
 import { Link, useParams } from 'react-router'
 import { OrderSummary } from '@/features/order/order-summary'
 import { getOrder } from '@/shared/api/endpoints'
 import { isApiError } from '@/shared/api/errors'
 import { keys } from '@/shared/api/query-keys'
+import { orThrow } from '@/shared/lib/assert'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
@@ -24,9 +26,19 @@ export function OrderPage() {
     const { orderId } = useParams()
     const orderQuery = useQuery({
         queryKey: keys.order(orderId),
-        queryFn: ({ signal }) => getOrder(orderId as string, signal),
+        queryFn: ({ signal }) => getOrder(orThrow(orderId, 'orderId'), signal),
         enabled: Boolean(orderId),
+        // Пока оплата pending — опрашиваем заказ, чтобы подхватить успех,
+        // если он случится на этой странице.
+        refetchInterval: (query) => {
+            const order = query.state.data
+            return order && order.status === 'awaiting_payment' && order.paymentStatus === 'pending' ? 2000 : false
+        },
     })
+
+    useEffect(() => {
+        document.title = 'Заказ — Магазин'
+    }, [])
 
     if (!orderId) {
         return (
@@ -46,9 +58,9 @@ export function OrderPage() {
 
     if (orderQuery.isPending) {
         return (
-            <div>
+            <div aria-busy='true'>
                 <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Заказ</h1>
-                <div className='flex min-w-0 max-w-xl flex-col gap-3'>
+                <div className='flex min-w-0 max-w-xl flex-col gap-3' role='status'>
                     <Skeleton className='h-5 w-1/3' />
                     <Skeleton className='h-4 w-full' />
                     <Skeleton className='h-4 w-full' />
@@ -59,19 +71,32 @@ export function OrderPage() {
     }
 
     if (orderQuery.isError) {
+        const isNotFound = isApiError(orderQuery.error) && orderQuery.error.status === 404
         return (
             <div>
                 <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Заказ</h1>
                 <Alert variant='destructive'>
                     <CircleAlert />
-                    <AlertTitle>Не удалось загрузить заказ</AlertTitle>
+                    <AlertTitle>{isNotFound ? 'Заказ не найден' : 'Не удалось загрузить заказ'}</AlertTitle>
                     <AlertDescription>
-                        {isApiError(orderQuery.error) ? orderQuery.error.message : 'Попробуйте ещё раз.'}
+                        {isNotFound
+                            ? 'Такого заказа нет. Возможно, данные были сброшены.'
+                            : isApiError(orderQuery.error)
+                              ? orderQuery.error.message
+                              : 'Попробуйте ещё раз.'}
                     </AlertDescription>
                 </Alert>
-                <Button className='mt-4 w-full sm:w-auto' onClick={() => void orderQuery.refetch()} type='button'>
-                    Повторить
-                </Button>
+                <div className='mt-4 flex min-w-0 flex-wrap gap-2'>
+                    {isNotFound ? (
+                        <Button asChild className='w-full sm:w-auto'>
+                            <Link to='/'>Вернуться в каталог</Link>
+                        </Button>
+                    ) : (
+                        <Button className='w-full sm:w-auto' onClick={() => void orderQuery.refetch()} type='button'>
+                            Повторить
+                        </Button>
+                    )}
+                </div>
             </div>
         )
     }

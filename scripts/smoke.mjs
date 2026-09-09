@@ -5,8 +5,13 @@ import SwaggerParser from '@apidevtools/swagger-parser';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 
-const base = (process.env.BASE_URL ?? 'http://localhost:4000').replace(/\/$/, '');
-const specResponse = await fetch(`${base}/openapi.json`, { signal: AbortSignal.timeout(5000) });
+const base = (process.env.BASE_URL ?? 'http://127.0.0.1:4000').replace(/\/$/, '');
+let specResponse;
+try {
+  specResponse = await fetch(`${base}/openapi.json`, { signal: AbortSignal.timeout(5000) });
+} catch {
+  assert.fail('Start the API before running npm run smoke');
+}
 assert.ok(specResponse.ok, 'Start the API before running npm run smoke');
 const spec = await SwaggerParser.validate(await specResponse.json());
 const ajv = addFormats(new Ajv({ strict: false }));
@@ -22,7 +27,13 @@ async function request(method, path, body, token, key, status = 200) {
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const json = await response.json();
+  const text = await response.text();
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    assert.fail(`${method} ${path}: expected a JSON body, got ${text ? `"${text}"` : '(empty)'}`);
+  }
   assert.equal(response.status, status, `${method} ${path}: ${JSON.stringify(json)}`);
   const template = Object.keys(spec.paths).find((p) =>
     new RegExp(`^${p.replace(/\{[^}]+\}/g, '[^/]+')}$`).test(path),
@@ -37,6 +48,7 @@ async function request(method, path, body, token, key, status = 200) {
 const token = (await request('POST', '/api/sessions', {}, undefined, undefined, 201)).token;
 const products = await request('GET', '/api/products');
 const product = products.find((p) => p.stock > 0);
+assert.ok(product, 'Catalog has no product with stock > 0 for the smoke run');
 const options = await request('GET', '/api/checkout/options', undefined, token);
 assert.equal(options.paymentMethods.length, 2);
 const sandbox = await request('GET', '/api/sandbox');

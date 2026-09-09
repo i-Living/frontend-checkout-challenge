@@ -1,7 +1,27 @@
 import assert from 'node:assert/strict';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { buildApp } from '../apps/api/dist/app.js';
+
+async function newestMtime(dir) {
+  let newest = 0;
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) newest = Math.max(newest, await newestMtime(full));
+    else newest = Math.max(newest, (await stat(full)).mtimeMs);
+  }
+  return newest;
+}
+
+const apiSrc = fileURLToPath(new URL('../apps/api/src', import.meta.url));
+const distApp = fileURLToPath(new URL('../apps/api/dist/app.js', import.meta.url));
+const distStat = await stat(distApp).catch(() => null);
+assert.ok(
+  distStat && distStat.mtimeMs >= (await newestMtime(apiSrc)),
+  'apps/api/dist is stale. Run `npm run build` before docs:check or docs:generate.',
+);
 
 const app = await buildApp();
 try {

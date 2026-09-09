@@ -24,7 +24,10 @@ jobs:
           api_pid=$!
           trap 'kill "$api_pid" 2>/dev/null || true' EXIT
           for attempt in {1..30}; do
-            if curl --fail --silent http://localhost:4000/health > /dev/null; then break; fi
+            if curl --fail --silent http://127.0.0.1:4000/health > /dev/null; then break; fi
             sleep 1
           done
-          npm run smoke
+          BASE_URL=http://127.0.0.1:4000 npm run smoke
+      - name: Show API log if smoke failed
+        if: failure()
+        run: cat /tmp/checkout-api.log || true

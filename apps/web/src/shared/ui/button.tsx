@@ -52,4 +52,5 @@ function Button({
     return <Comp data-slot='button' className={cn(buttonVariants({ variant, size, className }))} {...props} />
 }
 
+// biome-ignore lint/style/useComponentExportOnlyModules: shadcn-паттерн, buttonVariants осознанно живёт рядом с Button
 export { Button, buttonVariants }

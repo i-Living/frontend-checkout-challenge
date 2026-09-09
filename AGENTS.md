@@ -33,8 +33,8 @@ frontend-checkout-challenge/
 
 - Always use **npm** (`npm ci`, `npm run`, `npm exec`). Never bun, yarn, pnpm, or npx for project binaries.
 - Root scripts orchestrate workspaces: `npm run check`, `npm run build`.
-- Until the Vite app exists, `npm run dev` starts **API only** (`127.0.0.1:4000`).
-- After adding web, put its dev/build scripts in the solution README and refresh the root `package-lock.json`. Do not change root scripts without asking.
+- `npm run dev` starts the **API only** (`127.0.0.1:4000`). The web app runs in a second terminal: `npm run dev -w @checkout/web` (Vite, port 5173).
+- Web dev/build/typecheck scripts live in `apps/web/package.json`. After changing frontend dependencies, refresh the root `package-lock.json`. Do not change root scripts without asking.
 
 | Script | Command |
 |---|---|
@@ -42,7 +42,8 @@ frontend-checkout-challenge/
 | dev | `npm run dev` |
 | build | `npm run build` |
 | start | `npm start` |
-| check | `npm run check` (biome + api tests + openapi) |
+| check | `npm run check` (biome + api tests + web typecheck/build + openapi) |
+| check:web | `npm run check:web` (web typecheck + vite build) |
 | test | `npm test` |
 | smoke | `npm run smoke` (API already running) |
 | format | `npm run format` (`biome check --write`) |
@@ -59,7 +60,7 @@ Use `./node_modules/.bin/biome` or `npm run format` — never `npx biome` (wrong
 - Do **not** run Biome on `apps/api/` or `packages/contracts/` — provided code, do not reformat.
 - Enable Biome as default formatter in editor, format on save.
 - Manual check: `npm run check` (includes `biome check`).
-- Pre-commit: lint-staged runs `biome format --write` then `biome check --write` on staged web files.
+- Pre-commit: lint-staged runs `biome check --write` on staged web files.
 
 **Biome conventions:**
 - Indent: 4 spaces, LF line endings, 120 char width
@@ -76,9 +77,9 @@ Use `./node_modules/.bin/biome` or `npm run format` — never `npx biome` (wrong
 Before every commit, the following checks run automatically (in order):
 
 1. **Lint-staged** — Biome formats and lints staged `apps/web/src` files
-2. **TypeScript (api)** — `npm run build -w @checkout/api`
-3. **TypeScript (web)** — `npm run typecheck -w @checkout/web`
-4. **Build** — Full project build: contracts + api
+2. **TypeScript (web)** — `npm run typecheck -w @checkout/web`
+3. **Build (web)** — `npm run build -w @checkout/web`
+4. **Build (contracts + api)** — `npm run build`
 
 If any step fails, the commit is blocked. Do not skip formatting or type errors.
 Never use `git commit --no-verify`. If a pre-commit hook fails, investigate and fix the underlying issue.

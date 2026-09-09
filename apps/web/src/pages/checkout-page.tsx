@@ -35,7 +35,7 @@ function validateDraft(draft: CheckoutDraft): CheckoutFieldErrors {
     if (!draft.name.trim()) {
         errors.name = 'Укажите имя'
     }
-    if (!/.+@.+\..+/.test(draft.email.trim())) {
+    if (!/^\S+@\S+\.\S+$/.test(draft.email.trim())) {
         errors.email = 'Укажите корректный email'
     }
     if (!/^\+[1-9]\d{9,14}$/.test(draft.phone.trim())) {
@@ -71,15 +71,18 @@ function buildDelivery(draft: CheckoutDraft): CreateQuoteDelivery | null {
         if (!city || !street || !house) {
             return null
         }
-        if (apartment) {
-            return { method: 'courier', address: { city, street, house, apartment } } as CreateQuoteDelivery
+        return { method: 'courier', address: { city, street, house, ...(apartment ? { apartment } : {}) } }
+    }
+    if (draft.deliveryMethod === 'pickup') {
+        if (!draft.pickupPointId) {
+            return null
         }
-        return { method: 'courier', address: { city, street, house } } as CreateQuoteDelivery
+        // pickupPointId в черновике — string из опций API; каст точечный,
+        // только id к литеральному union контракта (те же id из API).
+        type PickupId = Extract<CreateQuoteDelivery, { method: 'pickup' }>['pickupPointId']
+        return { method: 'pickup', pickupPointId: draft.pickupPointId as PickupId }
     }
-    if (!draft.pickupPointId) {
-        return null
-    }
-    return { method: 'pickup', pickupPointId: draft.pickupPointId } as CreateQuoteDelivery
+    return null
 }
 
 /**
@@ -99,7 +102,7 @@ function toOrderErrorMessage(error: unknown): string {
             return 'Корзина пуста. Вернитесь в корзину и добавьте товары.'
         }
         if (error.code === 'IDEMPOTENCY_CONFLICT') {
-            return 'Запрос уже обрабатывался с другими данными. Повторите попытку.'
+            return 'Запрос уже обрабатывался с другими данными. Создан новый ключ — повторите попытку.'
         }
         return error.message
     }
@@ -108,6 +111,8 @@ function toOrderErrorMessage(error: unknown): string {
 
 /**
  * Маппит серверную VALIDATION_ERROR в полевые ошибки формы.
+ * Неизвестные поля (например apartment) сюда не попадают: их текст показывает
+ * общий алерт через toOrderErrorMessage (error.message).
  * @param error Ошибка создания заказа
  * @returns Карта полевых ошибок либо null, если это не серверная валидация
  */
@@ -150,6 +155,10 @@ export function CheckoutPage() {
     const setOrderId = useSessionStore((state) => state.setOrder)
     const setPaymentId = useSessionStore((state) => state.setPayment)
     const [errors, setErrors] = useState<CheckoutFieldErrors>({})
+
+    useEffect(() => {
+        document.title = 'Оформление заказа — Магазин'
+    }, [])
 
     const cartQuery = useQuery({
         queryKey: keys.cart,
@@ -209,7 +218,10 @@ export function CheckoutPage() {
     }, [draft, debouncedAddress])
 
     const effectiveDelivery = useMemo(() => buildDelivery(effectiveDraft), [effectiveDraft])
-    const deliveryKey = effectiveDelivery ? JSON.stringify(effectiveDelivery) : null
+    const deliveryKey = useMemo(
+        () => (effectiveDelivery ? JSON.stringify(effectiveDelivery) : null),
+        [effectiveDelivery],
+    )
     const cartVersion = cartQuery.data?.version
     const hasItems = (cartQuery.data?.items.length ?? 0) > 0
     const quoteEnabled =
@@ -217,10 +229,20 @@ export function CheckoutPage() {
 
     // B5: ключ включает cartVersion и hash delivery — запоздавший ответ по старому
     // ключу не затирает свежий, отмена через signal из Query.
+    // retry: 0 — quote это POST, неуспешный расчёт нельзя молча дублировать.
     const quoteQuery = useQuery({
-        queryKey: ['quote', cartVersion, deliveryKey],
-        queryFn: ({ signal }) => createQuote(cartVersion as number, effectiveDelivery as CreateQuoteDelivery, signal),
+        queryKey:
+            cartVersion === undefined || deliveryKey === null
+                ? keys.quote()
+                : keys.quoteByVersion(cartVersion, deliveryKey),
+        queryFn: ({ signal }) => {
+            if (cartVersion === undefined || effectiveDelivery === null) {
+                throw new Error('quote not ready')
+            }
+            return createQuote(cartVersion, effectiveDelivery, signal)
+        },
         enabled: quoteEnabled,
+        retry: 0,
     })
 
     useEffect(() => {
@@ -257,6 +279,10 @@ export function CheckoutPage() {
                 void queryClient.invalidateQueries({ queryKey: keys.cart })
             } else if (error.code === 'QUOTE_EXPIRED') {
                 void quoteQuery.refetch()
+            } else if (error.code === 'IDEMPOTENCY_CONFLICT') {
+                // Старый ключ привязан к другому телу: сбрасываем, чтобы повтор
+                // ушёл с новым ключом, а не получил тот же 409 вечно.
+                clearOrderKey()
             }
         },
     })
@@ -328,9 +354,9 @@ export function CheckoutPage() {
 
     if (cartQuery.isPending || optionsQuery.isPending) {
         return (
-            <div>
+            <div aria-busy='true'>
                 <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оформление заказа</h1>
-                <div className='grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]'>
+                <div className='grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]' role='status'>
                     <div className='flex min-w-0 flex-col gap-4'>
                         <Skeleton className='h-11 w-full' />
                         <Skeleton className='h-11 w-full' />
@@ -382,6 +408,10 @@ export function CheckoutPage() {
     const quote = quoteQuery.data
     const subtotal = quote?.subtotal ?? cart.subtotal
     const quoteError = quoteQuery.error
+    // Submit ждёт готового quote: без расчёта заказывать нечего, а тихий refetch
+    // по клику выглядел как «кнопка ничего не делает».
+    const isQuoteLoading = quoteEnabled && !quote
+    const isCourierIncomplete = draft.deliveryMethod === 'courier' && effectiveDelivery === null
 
     return (
         <div>
@@ -398,7 +428,7 @@ export function CheckoutPage() {
                     <CheckoutForm
                         draft={draft}
                         errors={errors}
-                        isPending={createOrderMutation.isPending}
+                        isPending={createOrderMutation.isPending || isQuoteLoading}
                         onDraftChange={handleDraftChange}
                         onSubmit={handleSubmit}
                         options={options}
@@ -475,8 +505,11 @@ export function CheckoutPage() {
                                     >
                                         Повторить
                                     </Button>
-                                    <p className='text-muted-foreground text-sm'>Считаем доставку…</p>
                                 </>
+                            ) : isCourierIncomplete ? (
+                                <p className='text-muted-foreground text-sm'>
+                                    Заполните город, улицу и дом, чтобы посчитать доставку.
+                                </p>
                             ) : (
                                 <p
                                     aria-live='polite'

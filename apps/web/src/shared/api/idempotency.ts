@@ -2,6 +2,7 @@
  * Ключи идемпотентности для заказов и платежей.
  * Переиспользует ключ при повторе того же тела, иначе генерирует новый.
  */
+import { v4 as uuidv4 } from 'uuid'
 import { useSessionStore } from '@/shared/store/session-store'
 
 /**
@@ -9,7 +10,7 @@ import { useSessionStore } from '@/shared/store/session-store'
  * @returns Случайный UUID-ключ.
  */
 export function newIdempotencyKey(): string {
-    return crypto.randomUUID()
+    return uuidv4()
 }
 
 /**

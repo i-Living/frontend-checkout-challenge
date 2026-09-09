@@ -23,6 +23,8 @@ type CartLineItem = Cart['items'][number]
  */
 interface CartLineProps {
     item: CartLineItem
+    /** Остаток товара на складе для ограничения количества (по умолчанию 99). */
+    stock?: number
     onQuantity: (absolute: number) => void
     onRemove: () => void
     isPending: boolean
@@ -31,12 +33,14 @@ interface CartLineProps {
 /**
  * Строка корзины: название, цена, степпер количества и удаление.
  * @param item позиция корзины
+ * @param stock остаток товара для ограничения количества
  * @param onQuantity обработчик смены количества (абсолютное значение)
  * @param onRemove обработчик удаления позиции
  * @param isPending блокировка контролов на время запроса
  */
-export function CartLine({ item, onQuantity, onRemove, isPending }: CartLineProps) {
+export function CartLine({ item, stock = 99, onQuantity, onRemove, isPending }: CartLineProps) {
     const inputId = `cart-qty-${item.productId}`
+    const max = Math.max(1, Math.min(99, stock))
     const [draft, setDraft] = useState(String(item.quantity))
 
     useEffect(() => {
@@ -44,7 +48,7 @@ export function CartLine({ item, onQuantity, onRemove, isPending }: CartLineProp
     }, [item.quantity])
 
     /**
-     * Проверяет и фиксирует введенное количество, приводит к диапазону 1–99.
+     * Проверяет и фиксирует введенное количество, приводит к диапазону 1–остаток.
      * @param value введенное количество
      */
     function commit(value: number) {
@@ -52,7 +56,7 @@ export function CartLine({ item, onQuantity, onRemove, isPending }: CartLineProp
             setDraft(String(item.quantity))
             return
         }
-        const clamped = Math.min(99, Math.max(1, Math.trunc(value)))
+        const clamped = Math.min(max, Math.max(1, Math.trunc(value)))
         setDraft(String(clamped))
         if (clamped !== item.quantity) {
             onQuantity(clamped)
@@ -80,10 +84,11 @@ export function CartLine({ item, onQuantity, onRemove, isPending }: CartLineProp
                     <Minus />
                 </Button>
                 <Input
+                    aria-describedby={`cart-qty-hint-${item.productId}`}
                     className='w-16 text-center'
                     disabled={isPending}
                     id={inputId}
-                    max={99}
+                    max={max}
                     min={1}
                     onBlur={(event) => commit(event.target.valueAsNumber)}
                     onChange={(event) => setDraft(event.target.value)}
@@ -97,7 +102,7 @@ export function CartLine({ item, onQuantity, onRemove, isPending }: CartLineProp
                 />
                 <Button
                     aria-label='Увеличить количество'
-                    disabled={isPending}
+                    disabled={isPending || item.quantity >= max}
                     onClick={() => onQuantity(item.quantity + 1)}
                     size='icon'
                     type='button'
@@ -106,6 +111,9 @@ export function CartLine({ item, onQuantity, onRemove, isPending }: CartLineProp
                     <Plus />
                 </Button>
             </div>
+            <p className='sr-only' id={`cart-qty-hint-${item.productId}`}>
+                От 1 до {max} шт.
+            </p>
             <p className='min-w-24 text-right font-semibold tabular-nums'>{formatMoney(item.lineTotal)}</p>
             <Button disabled={isPending} onClick={onRemove} size='sm' type='button' variant='ghost'>
                 <Trash2 />

@@ -4,7 +4,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, Info, LoaderCircle } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router'
 import { CardPicker } from '@/features/payment/card-picker'
 import { usePaymentPoll } from '@/features/payment/use-payment-poll'
@@ -21,6 +21,7 @@ import {
 import { isApiError } from '@/shared/api/errors'
 import { clearPaymentKey, getOrCreatePaymentKey } from '@/shared/api/idempotency'
 import { keys } from '@/shared/api/query-keys'
+import { orThrow } from '@/shared/lib/assert'
 import { useSessionStore } from '@/shared/store/session-store'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { Button } from '@/shared/ui/button'
@@ -55,11 +56,12 @@ export function PaymentPage() {
     const setPayment = useSessionStore((state) => state.setPayment)
     const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
     const [attemptPaymentId, setAttemptPaymentId] = useState<string | null>(null)
+    const [pollIntervalMs, setPollIntervalMs] = useState(800)
     const generationRef = useRef(0)
 
     const orderQuery = useQuery({
         queryKey: keys.order(orderId),
-        queryFn: ({ signal }) => getOrder(orderId as string, signal),
+        queryFn: ({ signal }) => getOrder(orThrow(orderId, 'orderId'), signal),
         enabled: Boolean(orderId),
     })
     const isCashOrder = orderQuery.data?.paymentMethod !== undefined && orderQuery.data.paymentMethod !== 'card'
@@ -71,11 +73,11 @@ export function PaymentPage() {
     })
     const paymentsQuery = useQuery({
         queryKey: keys.payments(orderId),
-        queryFn: ({ signal }) => listPayments(orderId as string, signal),
+        queryFn: ({ signal }) => listPayments(orThrow(orderId, 'orderId'), signal),
         enabled: Boolean(orderId) && isCardOrder,
     })
     const recoveryOrdersQuery = useQuery({
-        queryKey: keys.order(),
+        queryKey: keys.ordersList,
         queryFn: ({ signal }) => listOrders(signal),
         enabled: !orderId && !storedOrderId,
     })
@@ -93,10 +95,17 @@ export function PaymentPage() {
     // ТЕКУЩЕМУ заказу (есть в его списке попыток): иначе опрос чужого succeeded после
     // прошлой покупки редиректит на order-экран, откуда ведёт обратно — петля туда-обратно.
     // Список — источник правды с сервера; resumeId покрывает reload и без stored.
-    const orderPaymentIds = new Set((paymentsQuery.data ?? []).map((item) => item.id))
+    const orderPaymentIds = useMemo(
+        () => new Set((paymentsQuery.data ?? []).map((item) => item.id)),
+        [paymentsQuery.data],
+    )
     const storedForThisOrder = storedPaymentId && orderPaymentIds.has(storedPaymentId) ? storedPaymentId : null
     const effectivePaymentId = attemptPaymentId ?? storedForThisOrder ?? resumeId
-    const { payment, isTerminal } = usePaymentPoll(effectivePaymentId, !isCashOrder)
+    const { payment, isTerminal } = usePaymentPoll(effectivePaymentId, !isCashOrder, pollIntervalMs)
+
+    useEffect(() => {
+        document.title = 'Оплата заказа — Магазин'
+    }, [])
 
     useEffect(() => {
         if (isTerminal && orderId) {
@@ -106,36 +115,55 @@ export function PaymentPage() {
     }, [isTerminal, orderId, queryClient])
 
     // B2: повтор сети / двойной клик — те же key+body через getOrCreate.
-    // Новый ключ только после успеха (clear в onSuccess) или смены body/orderId.
+    // Новый ключ только после успеха (clear в onSuccess) или смены body/orderId,
+    // а также после PAYMENT_FINALIZED (см. onError ниже): иначе retry реплеит
+    // ту же финализированную попытку и вечно получает 409.
     /**
      * Создаёт платёж с ключом идемпотентности и запускает симуляцию сценария карты.
      * @param scenario Сценарий песочницы выбранной карты
      * @param generation Поколение попытки для отсева устаревших ответов
-     * @returns Созданный платёж
+     * @returns Созданный платёж и серверная пауза Retry-After для поллинга
      */
-    async function runAttempt(scenario: SimulationScenario, generation: number): Promise<Payment> {
-        const id = orderId as string
+    async function runAttempt(
+        scenario: SimulationScenario,
+        generation: number,
+    ): Promise<{ payment: Payment; retryAfterMs: number | null }> {
+        const id = orThrow(orderId, 'orderId')
         const key = getOrCreatePaymentKey(id, {})
         const created = await createPayment(id, key)
         if (generation !== generationRef.current) {
             throw new Error('stale')
         }
-        await createSimulation(created.id, scenario)
+        const { retryAfterMs } = await createSimulation(created.id, scenario)
         if (generation !== generationRef.current) {
             throw new Error('stale')
         }
-        return created
+        return { payment: created, retryAfterMs }
     }
 
     const payMutation = useMutation({
         mutationFn: ({ scenario }: AttemptVariables) => runAttempt(scenario, generationRef.current),
-        onSuccess: (created) => {
+        onSuccess: (result) => {
             // B2: успех — новый ключ для следующей попытки (retry после fail/cancel).
             clearPaymentKey()
-            setAttemptPaymentId(created.id)
-            setPayment(created.id)
-            void queryClient.invalidateQueries({ queryKey: keys.payment(created.id) })
+            setPollIntervalMs(result.retryAfterMs ?? 800)
+            setAttemptPaymentId(result.payment.id)
+            setPayment(result.payment.id)
+            void queryClient.invalidateQueries({ queryKey: keys.payment(result.payment.id) })
             if (orderId) {
+                void queryClient.invalidateQueries({ queryKey: keys.payments(orderId) })
+            }
+        },
+        onError: (error: unknown) => {
+            if (!isApiError(error)) {
+                return
+            }
+            if (error.code === 'PAYMENT_FINALIZED') {
+                // Попытка финализирована: старый ключ бесполезен, сбрасываем,
+                // чтобы «Оплатить снова» создала новую попытку с новым ключом.
+                clearPaymentKey()
+            }
+            if ((error.code === 'PAYMENT_FINALIZED' || error.code === 'PAYMENT_IN_PROGRESS') && orderId) {
                 void queryClient.invalidateQueries({ queryKey: keys.payments(orderId) })
             }
         },
@@ -179,7 +207,7 @@ export function PaymentPage() {
             return (
                 <div>
                     <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
-                    <div className='flex min-w-0 flex-col gap-3'>
+                    <div aria-busy='true' className='flex min-w-0 flex-col gap-3' role='status'>
                         <Skeleton className='h-11 w-full' />
                         <Skeleton className='h-11 w-full' />
                         <Skeleton className='h-10 w-40' />
@@ -217,7 +245,7 @@ export function PaymentPage() {
         return (
             <div>
                 <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
-                <div className='flex min-w-0 flex-col gap-3'>
+                <div aria-busy='true' className='flex min-w-0 flex-col gap-3' role='status'>
                     <Skeleton className='h-11 w-full' />
                     <Skeleton className='h-11 w-full' />
                     <Skeleton className='h-10 w-40' />
@@ -227,17 +255,30 @@ export function PaymentPage() {
     }
 
     if (orderQuery.isError) {
+        const isNotFound = isApiError(orderQuery.error) && orderQuery.error.status === 404
         return (
             <div>
                 <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
                 <Alert variant='destructive'>
                     <CircleAlert />
-                    <AlertTitle>Не удалось загрузить заказ</AlertTitle>
-                    <AlertDescription>{toErrorMessage(orderQuery.error)}</AlertDescription>
+                    <AlertTitle>{isNotFound ? 'Заказ не найден' : 'Не удалось загрузить заказ'}</AlertTitle>
+                    <AlertDescription>
+                        {isNotFound
+                            ? 'Такого заказа нет. Возможно, данные были сброшены.'
+                            : toErrorMessage(orderQuery.error)}
+                    </AlertDescription>
                 </Alert>
-                <Button className='mt-4 w-full sm:w-auto' onClick={() => void orderQuery.refetch()} type='button'>
-                    Повторить
-                </Button>
+                <div className='mt-4 flex min-w-0 flex-wrap gap-2'>
+                    {isNotFound ? (
+                        <Button asChild className='w-full sm:w-auto'>
+                            <Link to='/'>Вернуться в каталог</Link>
+                        </Button>
+                    ) : (
+                        <Button className='w-full sm:w-auto' onClick={() => void orderQuery.refetch()} type='button'>
+                            Повторить
+                        </Button>
+                    )}
+                </div>
             </div>
         )
     }
@@ -256,15 +297,13 @@ export function PaymentPage() {
         return <Navigate replace to={`/orders/${orderId}`} />
     }
 
-    if (payErrorCode === 'ORDER_ALREADY_PAID') {
-        return <Navigate replace to={`/orders/${orderId}`} />
-    }
-
+    // ORDER_ALREADY_PAID обрабатывается эффектом выше (инвалидация + навигация),
+    // отдельный render-редирект не нужен.
     if (sandboxQuery.isPending) {
         return (
             <div>
                 <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Оплата заказа</h1>
-                <div className='flex min-w-0 flex-col gap-3'>
+                <div aria-busy='true' className='flex min-w-0 flex-col gap-3' role='status'>
                     <Skeleton className='h-11 w-full' />
                     <Skeleton className='h-11 w-full' />
                     <Skeleton className='h-10 w-40' />
@@ -318,6 +357,14 @@ export function PaymentPage() {
     function handlePay() {
         if (!selectedCard || isProcessing) {
             return
+        }
+        if (payErrorCode === 'PAYMENT_FINALIZED' || cancelErrorCode === 'PAYMENT_FINALIZED') {
+            // Прошлая попытка финализирована (на случай, если onError не успел
+            // сбросить ключ): новая попытка обязана идти с новым ключом.
+            clearPaymentKey()
+            if (orderId) {
+                void queryClient.invalidateQueries({ queryKey: keys.payments(orderId) })
+            }
         }
         generationRef.current += 1
         payMutation.reset()

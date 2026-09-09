@@ -84,6 +84,12 @@ export interface RequestOptions {
     idempotencyKey?: string
 }
 
+/** Ответ с заголовками: данные и сырые заголовки ответа. */
+export interface ResponseMeta<T> {
+    data: T
+    headers: Headers
+}
+
 /** Сырая форма тела ошибки сервера до нормализации. */
 interface ErrorPayload {
     error?: {
@@ -136,14 +142,39 @@ function toApiError(json: unknown, status: number, requestIdHeader?: string): Ap
 }
 
 /**
- * Выполняет запрос к API и возвращает поле data из ответа.
+ * Разбирает заголовок Retry-After (секунды или HTTP-дата) в миллисекунды.
+ * Возвращает null, если заголовка нет или значение некорректно.
+ * @param headers Заголовки ответа.
+ * @returns Пауза в миллисекундах, ограниченная 250–10000 мс.
+ */
+export function parseRetryAfterMs(headers: Headers): number | null {
+    const raw = headers.get('Retry-After')
+    if (!raw) {
+        return null
+    }
+    const seconds = Number(raw)
+    if (Number.isFinite(seconds) && seconds >= 0) {
+        return Math.min(10_000, Math.max(250, seconds * 1000))
+    }
+    const date = Date.parse(raw)
+    if (!Number.isNaN(date)) {
+        const diff = date - Date.now()
+        if (diff > 0) {
+            return Math.min(10_000, Math.max(250, diff))
+        }
+    }
+    return null
+}
+
+/**
+ * Выполняет запрос к API и возвращает поле data вместе с заголовками ответа.
  * Пустой ответ и 204 возвращает как undefined.
  * @param path Путь запроса относительно API_BASE.
  * @param options Метод, тело, токен, сигнал отмены и ключ идемпотентности.
- * @returns Поле data успешного ответа.
+ * @returns Поле data успешного ответа и заголовки.
  * @throws ApiError при невалидном JSON или неуспешном статусе.
  */
-export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function requestWithMeta<T>(path: string, options: RequestOptions = {}): Promise<ResponseMeta<T>> {
     const { method = 'GET', body, token, signal, idempotencyKey } = options
     const headers: Record<string, string> = {}
     if (body !== undefined) {
@@ -163,11 +194,11 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     })
     const requestIdHeader = response.headers.get('X-Request-Id') ?? undefined
     if (response.status === 204) {
-        return undefined as T
+        return { data: undefined as T, headers: response.headers }
     }
     const text = await response.text()
     if (!text) {
-        return undefined as T
+        return { data: undefined as T, headers: response.headers }
     }
     let json: unknown
     try {
@@ -178,5 +209,18 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     if (!response.ok) {
         throw toApiError(json, response.status, requestIdHeader)
     }
-    return (json as { data: T }).data
+    return { data: (json as { data: T }).data, headers: response.headers }
+}
+
+/**
+ * Выполняет запрос к API и возвращает поле data из ответа.
+ * Пустой ответ и 204 возвращает как undefined.
+ * @param path Путь запроса относительно API_BASE.
+ * @param options Метод, тело, токен, сигнал отмены и ключ идемпотентности.
+ * @returns Поле data успешного ответа.
+ * @throws ApiError при невалидном JSON или неуспешном статусе.
+ */
+export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    const { data } = await requestWithMeta<T>(path, options)
+    return data
 }

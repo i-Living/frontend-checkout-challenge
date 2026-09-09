@@ -60,7 +60,7 @@ export function ProductCard({ product, quantityInCart, onAdd, onQuantity, onRemo
             </CardContent>
             <CardFooter className='mt-auto flex min-w-0 flex-wrap items-center gap-2'>
                 {outOfStock ? (
-                    <Button className='w-full sm:w-auto' disabled>
+                    <Button className='w-full sm:w-auto' disabled type='button'>
                         <PackageX />
                         Нет в наличии
                     </Button>

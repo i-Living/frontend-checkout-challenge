@@ -4,8 +4,8 @@
  */
 /** Единые ключи запросов: сессия, каталог, корзина, расчёты, заказы и платежи. */
 export const keys = {
-    /** Ключ сессии. */
-    session: ['session'],
+    /** Ключ списка заказов (восстановление после потери orderId). */
+    ordersList: ['orders'],
     /** Ключ списка товаров. */
     products: ['products'],
     /** Ключ корзины. */
@@ -14,6 +14,8 @@ export const keys = {
     checkoutOptions: ['checkout-options'],
     /** Ключ расчёта: общий или по id. */
     quote: (id?: string) => (id ? ['quote', id] : ['quote']),
+    /** Ключ расчёта по версии корзины и хэшу доставки (защита от поздних ответов). */
+    quoteByVersion: (version: number, deliveryHash: string) => ['quote', version, deliveryHash],
     /** Ключ песочницы. */
     sandbox: ['sandbox'],
     /** Ключ заказа: общий или по id. */

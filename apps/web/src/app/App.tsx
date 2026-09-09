@@ -8,6 +8,7 @@ import { ThemeToggle } from '@/features/theme/theme-toggle'
 import { getCart } from '@/shared/api/endpoints'
 import { keys } from '@/shared/api/query-keys'
 import { cn } from '@/shared/lib/cn'
+import { ErrorBoundary } from '@/shared/ui/error-boundary'
 
 /**
  * Корневой компонент layout.
@@ -51,7 +52,9 @@ export function App() {
                 </div>
             </header>
             <main className='mx-auto w-full min-w-0 max-w-5xl flex-1 px-4 py-6 sm:py-8'>
-                <Outlet />
+                <ErrorBoundary>
+                    <Outlet />
+                </ErrorBoundary>
             </main>
             <footer className='border-t'>
                 <p className='mx-auto w-full max-w-5xl px-4 py-4 text-center text-muted-foreground text-xs'>

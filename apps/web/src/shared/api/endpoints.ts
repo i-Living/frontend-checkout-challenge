@@ -10,10 +10,12 @@ import {
     cartItemPath,
     orderPath,
     orderPaymentsPath,
+    parseRetryAfterMs,
     paymentPath,
     paymentSimulationsPath,
     quotePath,
     request,
+    requestWithMeta,
 } from './client'
 import { isApiError } from './errors'
 import { ensureSession } from './session'
@@ -47,8 +49,16 @@ export type OrderList = operations['listOrders']['responses'][200]['content']['a
 export type Payment = operations['getPayment']['responses'][200]['content']['application/json']['data']
 /** Список платежей заказа. */
 export type PaymentList = operations['listPayments']['responses'][200]['content']['application/json']['data']
-/** Симуляция исхода платежа в песочнице. */
-export type Simulation = operations['createSimulation']['responses'][202]['content']['application/json']['data']
+/** Симуляция исхода платежа в песочнице (ответы 200/201/202 имеют одинаковую форму data). */
+export type Simulation =
+    | operations['createSimulation']['responses'][200]['content']['application/json']['data']
+    | operations['createSimulation']['responses'][201]['content']['application/json']['data']
+    | operations['createSimulation']['responses'][202]['content']['application/json']['data']
+/** Результат запуска симуляции: данные и серверная пауза Retry-After. */
+export interface SimulationResult {
+    simulation: Simulation
+    retryAfterMs: number | null
+}
 /** Сценарий симуляции платежа. */
 export type SimulationScenario =
     operations['createSimulation']['requestBody']['content']['application/json']['scenario']
@@ -75,6 +85,35 @@ async function withAuth<T>(path: string, options: Omit<RequestOptions, 'token'> 
             useSessionStore.getState().clearToken()
             const fresh = await ensureSession()
             return await request<T>(path, { ...options, token: fresh })
+        }
+        throw error
+    }
+}
+
+/**
+ * Выполняет запрос с токеном сессии и повторяет его после 401 с новой сессией.
+ * Возвращает данные вместе с заголовками ответа (нужны Retry-After/Location).
+ * @param path Путь запроса относительно API_BASE.
+ * @param options Параметры запроса без токена.
+ * @returns Поле data успешного ответа и заголовки.
+ * @throws ApiError при неуспешном статусе после повтора.
+ */
+async function withAuthMeta<T>(
+    path: string,
+    options: Omit<RequestOptions, 'token'> = {},
+): Promise<{ data: T; headers: Headers }> {
+    const token = await ensureSession()
+    try {
+        return await requestWithMeta<T>(path, { ...options, token })
+    } catch (error) {
+        if (
+            isApiError(error) &&
+            error.status === 401 &&
+            (error.code === 'SESSION_REQUIRED' || error.code === 'SESSION_INVALID')
+        ) {
+            useSessionStore.getState().clearToken()
+            const fresh = await ensureSession()
+            return await requestWithMeta<T>(path, { ...options, token: fresh })
         }
         throw error
     }
@@ -214,18 +253,18 @@ export function getPayment(paymentId: string, signal?: AbortSignal): Promise<Pay
  * @param paymentId Идентификатор платежа.
  * @param scenario Сценарий симуляции.
  * @param signal Сигнал отмены запроса.
- * @returns Созданная симуляция.
+ * @returns Созданная симуляция и серверная пауза Retry-After в мс.
  */
 export function createSimulation(
     paymentId: string,
     scenario: SimulationScenario,
     signal?: AbortSignal,
-): Promise<Simulation> {
-    return withAuth<Simulation>(paymentSimulationsPath(paymentId), {
+): Promise<SimulationResult> {
+    return withAuthMeta<Simulation>(paymentSimulationsPath(paymentId), {
         method: 'POST',
         body: { scenario },
         signal,
-    })
+    }).then(({ data, headers }) => ({ simulation: data, retryAfterMs: parseRetryAfterMs(headers) }))
 }
 
 /**

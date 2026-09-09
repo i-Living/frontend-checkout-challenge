@@ -71,11 +71,6 @@ interface SessionState {
      */
     setPayment: (paymentId: string | null) => void
     /**
-     * Заменяет черновик чекаута целиком.
-     * @param draft - Новый черновик формы
-     */
-    setDraft: (draft: CheckoutDraft) => void
-    /**
      * Частично обновляет черновик чекаута.
      * @param patch - Часть полей черновика для слияния
      */
@@ -90,8 +85,6 @@ interface SessionState {
      * @param entry - Запись с заказом, ключом и телом или null для сброса
      */
     setLastPayment: (entry: LastPaymentEntry | null) => void
-    /** Чистит обе последние попытки (заказ и оплату). */
-    clearLast: () => void
 }
 
 /**
@@ -127,11 +120,9 @@ export const useSessionStore = create<SessionState>()(
             clearToken: () => set({ token: null }),
             setOrder: (orderId) => set({ orderId }),
             setPayment: (paymentId) => set({ paymentId }),
-            setDraft: (draft) => set({ draft }),
             patchDraft: (patch) => set((state) => ({ draft: { ...state.draft, ...patch } })),
             setLastOrder: (entry) => set({ lastOrder: entry }),
             setLastPayment: (entry) => set({ lastPayment: entry }),
-            clearLast: () => set({ lastOrder: null, lastPayment: null }),
         }),
         {
             name: 'checkout.v1',

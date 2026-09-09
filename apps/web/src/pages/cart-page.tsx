@@ -4,9 +4,10 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, CircleAlert, ShoppingBasket } from 'lucide-react'
+import { useEffect, useMemo } from 'react'
 import { Link } from 'react-router'
 import { CartLine } from '@/features/cart/cart-line'
-import { getCart, removeCartItem, setCartItem } from '@/shared/api/endpoints'
+import { getCart, listProducts, removeCartItem, setCartItem } from '@/shared/api/endpoints'
 import { isApiError } from '@/shared/api/errors'
 import { keys } from '@/shared/api/query-keys'
 import { formatMoney } from '@/shared/lib/money'
@@ -41,6 +42,15 @@ export function CartPage() {
         queryKey: keys.cart,
         queryFn: ({ signal }) => getCart(signal),
     })
+    // Остатки для ограничения количества в строках корзины.
+    const productsQuery = useQuery({
+        queryKey: keys.products,
+        queryFn: ({ signal }) => listProducts(signal),
+    })
+    const stockById = useMemo(
+        () => new Map((productsQuery.data ?? []).map((product) => [product.id, product.stock] as const)),
+        [productsQuery.data],
+    )
     const setQuantityMutation = useMutation({
         mutationFn: ({ productId, quantity }: SetQuantityVariables) => setCartItem(productId, quantity),
         onSuccess: () => {
@@ -70,11 +80,15 @@ export function CartPage() {
         },
     })
 
+    useEffect(() => {
+        document.title = 'Корзина — Магазин'
+    }, [])
+
     if (cartQuery.isPending) {
         return (
-            <div>
+            <div aria-busy='true'>
                 <h1 className='mb-4 font-semibold text-2xl tracking-tight'>Корзина</h1>
-                <div className='flex flex-col gap-3'>
+                <div className='flex flex-col gap-3' role='status'>
                     {[0, 1].map((index) => (
                         <div className='flex min-w-0 flex-wrap items-center gap-3 rounded-xl border p-4' key={index}>
                             <div className='min-w-0 flex-1 basis-48'>
@@ -126,9 +140,6 @@ export function CartPage() {
                             Загляните в каталог и добавьте что-нибудь — оформление займёт пару минут.
                         </p>
                         <div className='mt-2 flex min-w-0 flex-wrap justify-center gap-2'>
-                            <Button className='w-full sm:w-auto' disabled type='button'>
-                                Перейти к оформлению
-                            </Button>
                             <Button asChild className='w-full sm:w-auto' variant='outline'>
                                 <Link to='/'>Вернуться в каталог</Link>
                             </Button>
@@ -171,6 +182,7 @@ export function CartPage() {
                                         setQuantityMutation.mutate({ productId: item.productId, quantity })
                                     }
                                     onRemove={() => removeMutation.mutate(item.productId)}
+                                    stock={stockById.get(item.productId) ?? 99}
                                 />
                             )
                         })}

@@ -52,6 +52,7 @@ export function DeliveryFields({ method, pickupPoints, values, errors, onChange 
                 <div className='flex min-w-0 flex-col gap-1.5'>
                     <Label htmlFor='checkout-city'>Город</Label>
                     <Input
+                        aria-describedby={errors.city ? 'checkout-city-error' : undefined}
                         aria-invalid={Boolean(errors.city)}
                         autoComplete='address-level2'
                         id='checkout-city'
@@ -59,7 +60,7 @@ export function DeliveryFields({ method, pickupPoints, values, errors, onChange 
                         value={values.city}
                     />
                     {errors.city ? (
-                        <p className='text-destructive text-sm' role='alert'>
+                        <p className='text-destructive text-sm' id='checkout-city-error' role='alert'>
                             {errors.city}
                         </p>
                     ) : null}
@@ -67,6 +68,7 @@ export function DeliveryFields({ method, pickupPoints, values, errors, onChange 
                 <div className='flex min-w-0 flex-col gap-1.5'>
                     <Label htmlFor='checkout-street'>Улица</Label>
                     <Input
+                        aria-describedby={errors.street ? 'checkout-street-error' : undefined}
                         aria-invalid={Boolean(errors.street)}
                         autoComplete='street-address'
                         id='checkout-street'
@@ -74,7 +76,7 @@ export function DeliveryFields({ method, pickupPoints, values, errors, onChange 
                         value={values.street}
                     />
                     {errors.street ? (
-                        <p className='text-destructive text-sm' role='alert'>
+                        <p className='text-destructive text-sm' id='checkout-street-error' role='alert'>
                             {errors.street}
                         </p>
                     ) : null}
@@ -83,13 +85,14 @@ export function DeliveryFields({ method, pickupPoints, values, errors, onChange 
                     <div className='flex min-w-0 flex-col gap-1.5'>
                         <Label htmlFor='checkout-house'>Дом</Label>
                         <Input
+                            aria-describedby={errors.house ? 'checkout-house-error' : undefined}
                             aria-invalid={Boolean(errors.house)}
                             id='checkout-house'
                             onChange={(event) => onChange({ house: event.target.value })}
                             value={values.house}
                         />
                         {errors.house ? (
-                            <p className='text-destructive text-sm' role='alert'>
+                            <p className='text-destructive text-sm' id='checkout-house-error' role='alert'>
                                 {errors.house}
                             </p>
                         ) : null}
@@ -111,6 +114,7 @@ export function DeliveryFields({ method, pickupPoints, values, errors, onChange 
         <div className='flex min-w-0 flex-col gap-1.5'>
             <Label htmlFor='checkout-pickup-point'>Пункт выдачи</Label>
             <select
+                aria-describedby={errors.pickupPointId ? 'checkout-pickup-point-error' : undefined}
                 aria-invalid={Boolean(errors.pickupPointId)}
                 className='border-input flex h-11 min-h-[44px] w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm'
                 id='checkout-pickup-point'
@@ -125,7 +129,7 @@ export function DeliveryFields({ method, pickupPoints, values, errors, onChange 
                 ))}
             </select>
             {errors.pickupPointId ? (
-                <p className='text-destructive text-sm' role='alert'>
+                <p className='text-destructive text-sm' id='checkout-pickup-point-error' role='alert'>
                     {errors.pickupPointId}
                 </p>
             ) : null}

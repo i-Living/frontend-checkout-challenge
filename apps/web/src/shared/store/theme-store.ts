@@ -15,7 +15,10 @@ export const THEME_STORAGE_KEY = 'checkout.theme'
  * @returns 'dark', если система тёмная, иначе 'light'.
  */
 function systemTheme(): Theme {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    }
+    return 'light'
 }
 
 /**
