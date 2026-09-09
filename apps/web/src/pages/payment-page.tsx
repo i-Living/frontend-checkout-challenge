@@ -169,11 +169,46 @@ export function PaymentPage() {
         },
     })
 
+    /**
+     * Создаёт попытку и запускает сценарий cancel — закрытие формы без оплаты.
+     * Не вызывается во время processing: у попытки уже есть симуляция, второй сценарий даст 409.
+     * @param generation Поколение попытки для отсева устаревших ответов
+     * @returns Созданный платёж и серверная пауза Retry-After для поллинга
+     */
+    async function runCancel(generation: number): Promise<{ payment: Payment; retryAfterMs: number | null }> {
+        const id = orThrow(orderId, 'orderId')
+        const key = getOrCreatePaymentKey(id, {})
+        const created = await createPayment(id, key)
+        if (generation !== generationRef.current) {
+            throw new Error('stale')
+        }
+        const { retryAfterMs } = await createSimulation(created.id, 'cancel')
+        if (generation !== generationRef.current) {
+            throw new Error('stale')
+        }
+        return { payment: created, retryAfterMs }
+    }
+
     const cancelMutation = useMutation({
-        mutationFn: (paymentId: string) => createSimulation(paymentId, 'cancel'),
-        onSuccess: (_data, paymentId) => {
-            void queryClient.invalidateQueries({ queryKey: keys.payment(paymentId) })
+        mutationFn: () => runCancel(generationRef.current),
+        onSuccess: (result) => {
+            clearPaymentKey()
+            setPollIntervalMs(result.retryAfterMs ?? 800)
+            setAttemptPaymentId(result.payment.id)
+            setPayment(result.payment.id)
+            void queryClient.invalidateQueries({ queryKey: keys.payment(result.payment.id) })
             if (orderId) {
+                void queryClient.invalidateQueries({ queryKey: keys.payments(orderId) })
+            }
+        },
+        onError: (error: unknown) => {
+            if (!isApiError(error)) {
+                return
+            }
+            if (error.code === 'PAYMENT_FINALIZED') {
+                clearPaymentKey()
+            }
+            if ((error.code === 'PAYMENT_FINALIZED' || error.code === 'PAYMENT_IN_PROGRESS') && orderId) {
                 void queryClient.invalidateQueries({ queryKey: keys.payments(orderId) })
             }
         },
@@ -347,7 +382,9 @@ export function PaymentPage() {
         payErrorCode === 'ORDER_ALREADY_PAID' ||
         payErrorCode === 'PAYMENT_NOT_REQUIRED'
     const showGenericPayError = mutationError !== null && !isStaleError && !isHandledPayCode
-    const showGenericCancelError = cancelMutation.error !== null && cancelErrorCode !== 'PAYMENT_FINALIZED'
+    const isStaleCancel = cancelMutation.error instanceof Error && cancelMutation.error.message === 'stale'
+    const showGenericCancelError =
+        cancelMutation.error !== null && cancelErrorCode !== 'PAYMENT_FINALIZED' && !isStaleCancel
     const selectedCard = sandboxCards.find((card) => card.id === selectedCardId) ?? null
 
     /**
@@ -373,14 +410,18 @@ export function PaymentPage() {
     }
 
     /**
-     * Отменяет текущую попытку оплаты через симуляцию cancel.
+     * Закрывает форму без оплаты: новая попытка со сценарием cancel.
+     * Во время processing не вызывается — у попытки уже есть симуляция.
      * @returns void
      */
     function handleCancel() {
-        if (!effectivePaymentId || payMutation.isPending || cancelMutation.isPending || isTerminal) {
+        if (payMutation.isPending || cancelMutation.isPending || isTerminal || isProcessing) {
             return
         }
-        cancelMutation.mutate(effectivePaymentId)
+        generationRef.current += 1
+        payMutation.reset()
+        cancelMutation.reset()
+        cancelMutation.mutate()
     }
 
     return (
@@ -480,9 +521,7 @@ export function PaymentPage() {
                         )}
                         <Button
                             className='w-full sm:w-auto'
-                            disabled={
-                                !effectivePaymentId || payMutation.isPending || cancelMutation.isPending || isTerminal
-                            }
+                            disabled={isProcessing || isTerminal}
                             onClick={handleCancel}
                             type='button'
                             variant='outline'

@@ -96,7 +96,7 @@ npm run build   # contracts + api
 
 ### Проверенные сценарии (EVALUATION.md)
 
-Живой прогон выполнен 2026-09-09 против API `127.0.0.1:4000`: `npm run smoke` — 5/5 PASS; прямые HTTP-проверки по всем пунктам A/B — PASS (факты ниже); фронт: `npm run dev -w @checkout/web` — HTTP 200 на `:5173`, `typecheck` exit 0, `biome check` — 0 ошибок, `vite build` — 2008 модулей ok. Сквозной клик-путь в браузере не выполнялся (нет браузера в среде), UI-поведение подтверждено кодом + grep-копиями.
+Живой прогон выполнен 2026-09-09 против API `127.0.0.1:4000`: `npm run smoke` — 5/5 PASS; прямые HTTP-проверки по всем пунктам A/B — PASS; фронт: `npm run dev -w @checkout/web` — HTTP 200 на `:5173`, `typecheck` exit 0, `biome check` — 0 ошибок, `vite build` — ok. Сквозной клик-путь в Chrome (Playwright, headless) — A1–A8, B1 decline/retry, B1 cancel-before-pay + retry, B3 F5 во время processing, B5 форма + late quote, B6 пустая корзина, C3 1280/390 без горизонтальной прокрутки.
 
 Основной сценарий (факты живого API):
 
@@ -111,25 +111,21 @@ npm run build   # contracts + api
 
 Устойчивость (факты живого API + код):
 
-- B1 — пройден: decline → `failed`/`CARD_DECLINED` (HTTP 200), заказ `awaiting_payment`; cancel → `cancelled`, заказ `awaiting_payment`; retry success на том же `orderId` → `paid`. Фронт: «Банк отклонил карту» / «Оплата отменена» + «Оплатить снова» (`payment-page.tsx:331,341,385`).
+- B1 — пройден: decline → `failed`/`CARD_DECLINED` (HTTP 200), заказ `awaiting_payment`; UI cancel до «Оплатить» → `cancelled` («Оплата отменена»); retry success на том же `orderId` → `paid`. Во время processing кнопка отмены неактивна: у попытки уже есть симуляция, второй сценарий даст 409.
 - B2 — пройден: повтор `POST /orders` с тем же key+body → 200 тот же id; тот же ключ + другое тело → 409 `IDEMPOTENCY_CONFLICT`; повтор `POST .../payments` → тот же payment id. Фронт: `getOrCreateOrderKey/getOrCreatePaymentKey`, clear только on success.
-- B3 — реализован в коде, живой F5 в браузере не выполнялся: persist `checkout.v1` (sessionStorage): token/orderId/paymentId/черновик/ключи; resume через `GET order` → `GET .../payments` (последняя активная) → продолжение poll; потеря orderId → `GET /api/orders`.
+- B3 — пройден в браузере: F5 на «Обрабатываем оплату…» сохраняет `checkout.v1` в sessionStorage и доводит оплату до «Заказ оплачен»; resume через `GET order` → `GET .../payments` (последняя активная) → продолжение poll; потеря orderId → `GET /api/orders`.
 - B4 — пройден: `POST /quotes` с будущей версией → 409 `CART_VERSION_CONFLICT`; фронт: invalidate cart + новый quote, форма жива (`checkout-page.tsx:73,198,402`).
-- B5 — частично в коде: форма живёт в Zustand (ошибка сети её не сносит), кнопка «Повторить», quote-key включает версию+delivery, generation-guard в `payment-page.tsx:42,94`; поздний-ответ-побеждает кейс живым ретестом не гонялся.
+- B5 — пройден: черновик формы остаётся после ошибки валидации; запоздавший quote самовывоза не затирает курьерский расчёт (ключ query = версия корзины + delivery); generation-guard на оплате отсекает stale.
 - B6 — пройден: пустой quote → 422 `CART_EMPTY` (фронт: «Корзина пуста», CTA disabled, нет перехода на `/checkout`); qty 99 → 409 `INSUFFICIENT_STOCK` «Доступно не более 10 шт.»; clock-dot → 409; poll останавливается на терминальном статусе (`refetchInterval: false`) и на unmount (signal).
 
 Интерфейс/код (проверено кодом + grep):
 
 - C1 — копии на месте (34 совпадения): состояния loading/skeleton, «Обрабатываем оплату…», Alert-ошибки, success-Card различимы.
 - C2 — все поля с `<label htmlFor>` (Имя/Email/Телефон/Город/Улица/Дом/Квартира/Пункт), ошибки строками NEED_INPUT-3=A, focus-visible стили, `aria-live` на статусах.
-- C3 — каталог `grid-cols-1/sm:2/lg:3`, checkout `lg:grid-cols-[1fr_380px]` + sticky quote, CTA `w-full sm:w-auto`, поля `min-h-[44px]`, `body overflow-x:hidden`; скриншоты 1280/390 не снимались (нет браузера).
+- C3 — пройден в браузере на 1280 и 390: каталог/корзина/оформление без горизонтальной прокрутки страницы; каталог `grid-cols-1/sm:2/lg:3`, checkout `lg:grid-cols-[1fr_380px]` + sticky quote, CTA `w-full sm:w-auto`, поля `min-h-[44px]`.
 - D1/D2 — пройден: слои разделены, `fetch` только в `client.ts`, типы из `generated.d.ts`, README описывает путь клиента.
 
 ### Недоработки
 
-- Сквозной браузерный прогон (клики, F5 во время processing, вьюпорты 1280/390 со скриншотами) не выполнен — в среде нет браузера; покрыто живым API + статикой кода.
+- Отменить уже ушедшую в банк попытку нельзя: у платежа одна симуляция. «Отменить оплату» — закрытие формы до «Оплатить»; во время processing кнопка неактивна.
 - Тестовые сессии/заказы прогона остались в локальном `.data/store.json` (gitignored); при желании — остановить API и `npm run data:reset`.
-
-### Затраченное время
-
-Параллельные сабагенты (точное время неизвестно) + финальная сессия живой проверки A/B и фронта (~1 ч).
