@@ -1,11 +1,11 @@
 /**
- * Примитив инпута shadcn: текстовое поле формы с доступными состояниями.
+ * Поле ввода. h-11 / min-h 44px — зона нажатия; aria-invalid красит кольцо, его ставит FormField.
  */
 import type { ComponentProps } from 'react'
 import { cn } from '@/shared/lib/cn'
 
 /**
- * Однострочное поле ввода (например имя, email, адрес доставки).
+ * Нативный input. id и aria-* не задавать здесь — FormField прокидывает их в единственного ребёнка.
  */
 function Input({ className, type, ...props }: ComponentProps<'input'>) {
     return (

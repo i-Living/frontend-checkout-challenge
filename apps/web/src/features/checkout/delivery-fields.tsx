@@ -1,5 +1,5 @@
 /**
- * Поля доставки: адрес курьера или выбор пункта выдачи.
+ * Поля доставки под выбранный method. Курьер и самовывоз не монтируются вместе — чужие ошибки не висят.
  */
 import type { CheckoutOptions } from '@/shared/api/endpoints'
 import type { CheckoutDraft } from '@/shared/store/session-store'
@@ -7,22 +7,22 @@ import { FormField } from '@/shared/ui/form-field'
 import { Input } from '@/shared/ui/input'
 
 /**
- * Список пунктов выдачи из опций доставки.
+ * Пункты из options.deliveryMethods[].pickupPoints; у courier массив пустой.
  */
 type PickupPoints = CheckoutOptions['deliveryMethods'][number]['pickupPoints']
 
 /**
- * Значения полей доставки.
+ * Срез черновика. Не тащить name/email сюда — это контакты.
  */
 type DeliveryValues = Pick<CheckoutDraft, 'pickupPointId' | 'city' | 'street' | 'house' | 'apartment'>
 
 /**
- * Ошибки полей доставки.
+ * apartment в ошибках нет: поле необязательное, серверный текст уйдёт в общий алерт.
  */
 type DeliveryErrors = Partial<Record<'pickupPointId' | 'city' | 'street' | 'house', string>>
 
 /**
- * Пропсы полей доставки.
+ * method — id из API (`pickup` / `courier`), не title.
  */
 interface DeliveryFieldsProps {
     method: string
@@ -33,7 +33,7 @@ interface DeliveryFieldsProps {
 }
 
 /**
- * Поля доставки под выбранный способ: адрес курьера или пункт выдачи.
+ * courier → адрес; иначе пункт выдачи (в том числе пустой method — селект, чтобы можно было выбрать).
  */
 export function DeliveryFields({ method, pickupPoints, values, errors, onChange }: DeliveryFieldsProps) {
     if (method === 'courier') {

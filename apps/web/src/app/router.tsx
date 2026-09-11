@@ -1,5 +1,5 @@
 /**
- * Маршруты приложения: корневой layout и страницы каталога, корзины, оформления, оплаты и заказа.
+ * Маршруты. `orders/:orderId/pay` объявлен раньше `orders/:orderId`, иначе pay съест параметр.
  */
 import { createBrowserRouter } from 'react-router'
 import { App } from '@/app/App'
@@ -12,8 +12,7 @@ import { PaymentPage } from '@/pages/payment-page'
 import { RouteError } from '@/shared/ui/error-boundary'
 
 /**
- * Браузерный роутер приложения.
- * Корень '/' рендерит layout App, вложенные пути — страницы магазина и заказа.
+ * errorElement — RouteError (reload). Падение рендера страницы ловит ErrorBoundary в App.
  */
 export const router = createBrowserRouter([
     {

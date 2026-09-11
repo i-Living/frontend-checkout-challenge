@@ -1,5 +1,6 @@
 /**
- * Карточка успешного заказа: общий каркас для карты и наличных.
+ * Успех заказа. Карта и наличные делят каркас; различаются title/description со страницы.
+ * Суммы внутри — из order, не из только что завершённого платежа.
  */
 import { CircleCheck } from 'lucide-react'
 import type { Order } from '@/shared/api/endpoints'
@@ -7,10 +8,10 @@ import { Card, CardContent } from '@/shared/ui/card'
 import { OrderSummary } from './order-summary'
 
 /**
- * Зелёная карточка успеха с сводкой заказа.
- * @param title Заголовок (оплачен / оплата при получении).
- * @param description Подзаголовок.
- * @param order Заказ с сервера.
+ * Показывать только после проверки статусов на OrderPage. Сама карточка статусы не проверяет.
+ * @param title «Заказ оплачен» или «Заказ оформлен, оплата при получении»
+ * @param description Короткий подзаголовок
+ * @param order GET /api/orders/:id, не ответ 201 создания
  */
 export function OrderSuccessCard({ title, description, order }: { title: string; description: string; order: Order }) {
     return (

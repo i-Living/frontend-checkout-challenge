@@ -1,5 +1,5 @@
 /**
- * Общие экраны загрузки и ошибки запроса.
+ * Экраны загрузки и ошибки. 404 ведёт в каталог, остальные ошибки — на refetch.
  * Страницы не копируют скелетон + Alert + «Повторить».
  */
 import { CircleAlert } from 'lucide-react'
@@ -10,9 +10,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { Button } from '@/shared/ui/button'
 
 /**
- * Скелетон страницы: заголовок и переданная разметка загрузки.
- * @param title Заголовок экрана.
- * @param skeleton Содержимое со role=status.
+ * Заголовок + скелетон. aria-busy на корне; role=status должен быть на самом skeleton.
+ * @param title Тот же h1, что у готовой страницы, чтобы вёрстка не прыгала.
+ * @param skeleton Разметка со role=status.
  */
 export function PagePending({ title, skeleton }: { title: string; skeleton: ReactNode }): ReactNode {
     return (
@@ -24,13 +24,14 @@ export function PagePending({ title, skeleton }: { title: string; skeleton: Reac
 }
 
 /**
- * Экран ошибки запроса: алерт и повтор или ссылка в каталог при 404.
- * @param title Заголовок экрана.
- * @param errorTitle Заголовок алерта (не 404).
+ * Алерт ошибки. 404 (если передан notFoundTitle) — ссылка в каталог, не refetch:
+ * повторять несуществующий заказ бессмысленно.
+ * @param title h1 страницы.
+ * @param errorTitle Заголовок алерта, если это не 404.
  * @param error Ошибка запроса.
- * @param onRetry Повтор запроса; для 404 не используется.
- * @param notFoundTitle Заголовок алерта при 404.
- * @param notFoundDescription Пояснение при 404.
+ * @param onRetry refetch; для 404 игнорируется.
+ * @param notFoundTitle Если задан и ошибка 404 — другая ветка UI.
+ * @param notFoundDescription Пояснение 404.
  */
 export function PageError({
     title,

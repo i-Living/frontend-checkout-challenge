@@ -1,11 +1,11 @@
 /**
- * Фикстуры API-сущностей для юнит- и компонентных тестов.
+ * Фикстуры формы OpenAPI. Не урезать поля: лишний Partial в тесте маскирует, что экран ждёт title/stock.
  */
 import type { Cart, CheckoutOptions, Order, Payment, Product, Quote, Sandbox } from '@/shared/api/endpoints'
 import type { ApiError } from '@/shared/api/errors'
 import type { CheckoutDraft } from '@/shared/store/session-store'
 
-/** Пустой черновик оформления. */
+/** Все поля пустые — для тестов валидации и «quote ещё не слать». */
 export const emptyDraft: CheckoutDraft = {
     name: '',
     email: '',
@@ -19,7 +19,7 @@ export const emptyDraft: CheckoutDraft = {
     apartment: '',
 }
 
-/** Валидный черновик самовывоза и оплаты картой. */
+/** Самовывоз + карта, проходит validateDraft. Для курьера патчить method и адрес. */
 export const validPickupDraft: CheckoutDraft = {
     name: 'Тестовый Покупатель',
     email: 'buyer@example.test',
@@ -34,8 +34,8 @@ export const validPickupDraft: CheckoutDraft = {
 }
 
 /**
- * Собирает товар каталога.
- * @param overrides Частичные поля товара
+ * Товар по умолчанию в наличии (stock 10). Для «нет в наличии» передавать stock: 0.
+ * @param overrides Частичные поля
  */
 export function makeProduct(overrides: Partial<Product> = {}): Product {
     return {
@@ -51,8 +51,8 @@ export function makeProduct(overrides: Partial<Product> = {}): Product {
 }
 
 /**
- * Собирает корзину сессии.
- * @param overrides Частичные поля корзины
+ * Одна лампа, version 1. Пустая корзина — items: [], quantity: 0, subtotal: 0 (не только items).
+ * @param overrides Частичные поля
  */
 export function makeCart(overrides: Partial<Cart> = {}): Cart {
     return {
@@ -75,8 +75,8 @@ export function makeCart(overrides: Partial<Cart> = {}): Cart {
 }
 
 /**
- * Собирает опции оформления.
- * @param overrides Частичные поля опций
+ * Два способа доставки и две оплаты как у API. Тесты клавиатуры и пунктов опираются на эти id.
+ * @param overrides Частичные поля
  */
 export function makeCheckoutOptions(overrides: Partial<CheckoutOptions> = {}): CheckoutOptions {
     return {
@@ -109,8 +109,8 @@ export function makeCheckoutOptions(overrides: Partial<CheckoutOptions> = {}): C
 }
 
 /**
- * Собирает расчёт заказа.
- * @param overrides Частичные поля расчёта
+ * Самовывоз, shipping 0. Для курьера переопределять shipping/total — не складывать на клиенте.
+ * @param overrides Частичные поля
  */
 export function makeQuote(overrides: Partial<Quote> = {}): Quote {
     return {
@@ -136,8 +136,8 @@ export function makeQuote(overrides: Partial<Quote> = {}): Quote {
 }
 
 /**
- * Собирает заказ.
- * @param overrides Частичные поля заказа
+ * По умолчанию awaiting_payment / unpaid / card — ещё не успех. Успех карты и наличных задавать явно.
+ * @param overrides Частичные поля
  */
 export function makeOrder(overrides: Partial<Order> = {}): Order {
     return {
@@ -171,8 +171,8 @@ export function makeOrder(overrides: Partial<Order> = {}): Order {
 }
 
 /**
- * Собирает платёж.
- * @param overrides Частичные поля платежа
+ * По умолчанию pending. failed + CARD_DECLINED — отказ банка (HTTP 200).
+ * @param overrides Частичные поля
  */
 export function makePayment(overrides: Partial<Payment> = {}): Payment {
     return {
@@ -187,7 +187,7 @@ export function makePayment(overrides: Partial<Payment> = {}): Payment {
     }
 }
 
-/** Тестовые карты песочницы. */
+/** Две карты: success и decline. Форма не должна требовать PAN/CVC. */
 export const sandbox: Sandbox = {
     settlementDelayMs: 1200,
     cards: [
@@ -207,8 +207,8 @@ export const sandbox: Sandbox = {
 }
 
 /**
- * Matcher Testing Library: сравнивает текст без различия обычных и неразрывных пробелов Intl.
- * @param expected Ожидаемая строка, например formatMoney(249000)
+ * Intl.NumberFormat ставит NBSP/узкие пробелы — обычный getByText('2 490,00 ₽') флапает.
+ * @param expected Строка formatMoney, пробелы любого вида
  */
 export function byNormalizedText(expected: string) {
     const compact = expected.replace(/[\s\u00a0\u202f]/g, '')
@@ -227,8 +227,8 @@ export function byNormalizedText(expected: string) {
 }
 
 /**
- * Собирает нормализованную ошибку API.
- * @param overrides Частичные поля ошибки
+ * ApiError как из client.ts (name: 'ApiError'). `new Error()` isApiError не пройдёт.
+ * @param overrides code/status/fields
  */
 export function makeApiError(overrides: Partial<ApiError> = {}): ApiError {
     return {

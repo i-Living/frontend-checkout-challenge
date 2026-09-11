@@ -1,18 +1,18 @@
 /**
- * Хранилище темы оформления: светлая/тёмная, выбор пользователя в localStorage.
+ * Тема оформления. Выбор в localStorage (в отличие от сессии — переживает вкладку).
  */
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
-/** Доступные темы оформления. */
+/** Светлая или тёмная; системного «auto» после первого выбора нет — toggle бинарный. */
 export type Theme = 'light' | 'dark'
 
-/** Ключ persisted-состояния темы в localStorage. */
+/** Отдельный ключ от checkout.v1, чтобы сброс сессии не сбрасывал тему. */
 export const THEME_STORAGE_KEY = 'checkout.theme'
 
 /**
- * Системная тема из prefers-color-scheme (дефолт до первого выбора).
- * @returns 'dark', если система тёмная, иначе 'light'.
+ * Тема ОС до первого выбора пользователя. Без window (SSR/тесты) — light.
+ * @returns 'dark' при prefers-color-scheme: dark.
  */
 function systemTheme(): Theme {
     if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
@@ -22,7 +22,7 @@ function systemTheme(): Theme {
 }
 
 /**
- * Применяет тему к документу через класс dark на html.
+ * Класс `dark` на <html> — так работает Tailwind v4. Не на body.
  * @param theme Тема для применения.
  */
 function applyTheme(theme: Theme): void {
@@ -31,13 +31,13 @@ function applyTheme(theme: Theme): void {
 
 /** Состояние стора темы. */
 interface ThemeState {
-    /** Текущая тема. */
+    /** Текущая тема, уже применённая к документу. */
     theme: Theme
-    /** Переключает тему и применяет её к документу. */
+    /** Переключает тему и сразу пишет класс на html, не дожидаясь рендера. */
     toggle: () => void
 }
 
-/** Стор темы с персистом выбора в localStorage. */
+/** persist в localStorage: тема не привязана к гостевой сессии магазина. */
 export const useThemeStore = create<ThemeState>()(
     persist(
         (set, get) => ({
@@ -53,7 +53,7 @@ export const useThemeStore = create<ThemeState>()(
 )
 
 /**
- * Применяет сохранённую тему до первого рендера, чтобы не мигало.
+ * До createRoot, иначе первый кадр вспыхнет системной/светлой темой.
  */
 export function initTheme(): void {
     applyTheme(useThemeStore.getState().theme)

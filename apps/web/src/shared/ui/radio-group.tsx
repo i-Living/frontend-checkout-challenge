@@ -1,5 +1,5 @@
 /**
- * Примитив радиогруппы на Radix: выбор одного варианта (доставка, оплата).
+ * Радиогруппа Radix. Клавиатурный выбор (стрелки) уже внутри; OptionRadioGroup добавляет подписи и fieldset.
  */
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group'
 import { CircleIcon } from 'lucide-react'
@@ -7,7 +7,7 @@ import type { ComponentProps } from 'react'
 import { cn } from '@/shared/lib/cn'
 
 /**
- * Группа радиокнопок для выбора одного варианта из списка.
+ * Корень группы. value — id опции, не индекс.
  */
 function RadioGroup({ className, ...props }: ComponentProps<typeof RadioGroupPrimitive.Root>) {
     return <RadioGroupPrimitive.Root data-slot='radio-group' className={cn('grid gap-3', className)} {...props} />

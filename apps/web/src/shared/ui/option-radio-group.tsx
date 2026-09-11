@@ -1,12 +1,12 @@
 /**
- * Радио-список вариантов: доставка, оплата, тестовые карты.
+ * Радио-список доставки, оплаты, карт. С legend — fieldset, без него обязателен ariaLabel.
  */
 import type { ReactNode } from 'react'
 import { cn } from '@/shared/lib/cn'
 import { Label } from '@/shared/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/shared/ui/radio-group'
 
-/** Один пункт радио-списка. */
+/** Пункт списка. description справа моноширинный (маска карты), не второй заголовок. */
 export interface RadioOption {
     id: string
     title: string
@@ -14,14 +14,14 @@ export interface RadioOption {
 }
 
 /**
- * Группа радиокнопок с подписью пункта и опциональным описанием справа.
- * @param name Префикс id пунктов.
- * @param value Выбранный id.
- * @param options Список пунктов.
- * @param onChange Выбор пункта.
- * @param legend Подпись fieldset; без неё — только aria-label.
- * @param ariaLabel Доступное имя группы, если legend нет.
- * @param disabled Блокировка на время запроса.
+ * Один выбранный id. Клавиатура — стрелки Radix; клик по Label тоже выбирает (htmlFor).
+ * @param name Префикс html id пунктов (`card-card-success`), не name нативной формы.
+ * @param value id выбранной опции; пустая строка — ничего не выбрано.
+ * @param options id стабильны (id с API), не индексы.
+ * @param onChange id опции.
+ * @param legend Видимая подпись fieldset; если есть, ariaLabel не нужен.
+ * @param ariaLabel Имя группы без видимого legend (список карт).
+ * @param disabled На время processing, чтобы не сменить карту под уходящим запросом.
  */
 export function OptionRadioGroup({
     name,

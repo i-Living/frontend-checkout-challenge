@@ -1,13 +1,13 @@
 /**
- * Страница 404: неизвестный адрес.
+ * Неизвестный маршрут. Не путать с 404 заказа — тот рисует OrderPage через queryGate.
  */
 import { Link } from 'react-router'
 import { usePageTitle } from '@/shared/lib/use-page-title'
 import { Button } from '@/shared/ui/button'
 
 /**
- * Заглушка неизвестного маршрута со ссылкой в каталог.
- * @returns Разметка страницы 404
+ * Catch-all `*`. Ссылка в каталог, не history.back — истории может не быть.
+ * @returns Страница 404
  */
 export function NotFoundPage() {
     usePageTitle('Страница не найдена')

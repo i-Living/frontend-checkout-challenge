@@ -1,26 +1,24 @@
 /**
- * Декоративная визуальная плашка товара каталога (градиент + иконка по id).
- * API картинок не отдаёт, поэтому визуал генерируется локально: детерминирован,
- * ничего не весит и не зависит от внешней сети.
+ * Плашка товара. API картинок не отдаёт — визуал локальный, детерминированный по productId,
+ * без сети и без случайных градиентов (F5 не меняет картинку).
  */
 import { AlarmClock, Coffee, Lamp, type LucideIcon, Package, ShoppingBag } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
 
 /**
- * Визуальная тема товара: иконка, градиент плашки и цвет иконки.
+ * Тема плашки. gradient — только Tailwind from/via/to, без url().
  */
 interface ProductVisualTheme {
-    /** Иконка товара. */
+    /** Иконка Lucide, не img. */
     icon: LucideIcon
-    /** Классы градиента фона плашки. */
+    /** Классы градиента, стыкуются с `bg-gradient-to-br`. */
     gradient: string
-    /** Классы цвета иконки. */
+    /** Цвет иконки, отдельно от фона — в dark нужен другой оттенок. */
     iconClass: string
 }
 
 /**
- * Тема визуала по умолчанию для неизвестных товаров: нейтральная посылка,
- * чтобы не путаться с иконками реальных позиций каталога.
+ * Неизвестный id (новый товар в API) — нейтральная посылка, не чужая иконка из каталога.
  */
 const fallbackTheme: ProductVisualTheme = {
     icon: Package,
@@ -29,7 +27,7 @@ const fallbackTheme: ProductVisualTheme = {
 }
 
 /**
- * Темы визуалов по идентификаторам товаров каталога.
+ * Ключи — id из GET /api/products, не title. Новый sku без записи сюда получит fallback.
  */
 const themes: Record<string, ProductVisualTheme> = {
     'lamp-orbit': {
@@ -55,9 +53,9 @@ const themes: Record<string, ProductVisualTheme> = {
 }
 
 /**
- * Плашка 16:10 с градиентом и контурной иконкой товара.
- * @param productId Идентификатор товара для выбора темы
- * @returns Декоративный блок визуала
+ * aria-hidden: декорация, название товара уже в CardTitle.
+ * @param productId Id из каталога
+ * @returns Плашка h-36, не квадрат — карточки выравниваются по низу сетки
  */
 export function ProductVisual({ productId }: { productId: string }) {
     const theme = themes[productId] ?? fallbackTheme

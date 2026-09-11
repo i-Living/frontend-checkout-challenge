@@ -1,16 +1,16 @@
-﻿/**
- * Базовый HTTP-клиент API: базовый URL, пути и обёртка над fetch.
- * Отвечает за заголовки, разбор JSON и маппинг ошибок в ApiError.
+/**
+ * Единственный HTTP-шов: base URL, Authorization, Idempotency-Key, JSON/204 → ApiError.
+ * Страницы fetch не вызывают — новый запрос добавляется в endpoints.ts.
  */
 import type { ApiError } from './errors'
 
-/** Сырой базовый URL API из переменной окружения. */
+/** `VITE_API_URL` из env фронта; в dev может быть пусто — тогда локальный API. */
 const envUrl = import.meta.env.VITE_API_URL as string | undefined
 
-/** Базовый URL API с запасным локальным значением. */
+/** Совпадает с дефолтом бэкенда `127.0.0.1:4000`. Другой порт — через VITE_API_URL, плюс CORS_ORIGINS на API. */
 export const API_BASE: string = envUrl ?? 'http://127.0.0.1:4000'
 
-/** Карта основных путей API. */
+/** Коллекции без id в пути. Позиции, заказы, платежи — через encodeURIComponent-билдеры ниже. */
 export const API_PATHS = {
     sessions: '/api/sessions',
     products: '/api/products',
@@ -22,60 +22,60 @@ export const API_PATHS = {
 } as const
 
 /**
- * Строит путь позиции корзины по идентификатору товара.
- * @param productId Идентификатор товара.
- * @returns Путь вида /api/cart/items/:id.
+ * PUT/DELETE позиции. Id кодируется: слэш в productId не должен стать новым сегментом пути.
+ * @param productId Id товара из каталога, не индекс строки.
+ * @returns `/api/cart/items/:id`
  */
 export function cartItemPath(productId: string): string {
     return `/api/cart/items/${encodeURIComponent(productId)}`
 }
 
 /**
- * Строит путь расчёта по его идентификатору.
- * @param quoteId Идентификатор расчёта.
- * @returns Путь вида /api/quotes/:id.
+ * GET расчёта по id. POST живёт на API_PATHS.quotes.
+ * @param quoteId UUID расчёта из POST /api/quotes.
+ * @returns `/api/quotes/:id`
  */
 export function quotePath(quoteId: string): string {
     return `/api/quotes/${encodeURIComponent(quoteId)}`
 }
 
 /**
- * Строит путь заказа по его идентификатору.
- * @param orderId Идентификатор заказа.
- * @returns Путь вида /api/orders/:id.
+ * GET одного заказа. Список и создание — API_PATHS.orders.
+ * @param orderId UUID заказа.
+ * @returns `/api/orders/:id`
  */
 export function orderPath(orderId: string): string {
     return `/api/orders/${encodeURIComponent(orderId)}`
 }
 
 /**
- * Строит путь платежей заказа.
- * @param orderId Идентификатор заказа.
- * @returns Путь коллекции платежей заказа.
+ * GET списка попыток и POST новой попытки.
+ * @param orderId UUID заказа, не платежа.
+ * @returns `/api/orders/:id/payments`
  */
 export function orderPaymentsPath(orderId: string): string {
     return `/api/orders/${encodeURIComponent(orderId)}/payments`
 }
 
 /**
- * Строит путь платежа по его идентификатору.
- * @param paymentId Идентификатор платежа.
- * @returns Путь вида /api/payments/:id.
+ * GET одной попытки для поллинга. Не путать с коллекцией заказа.
+ * @param paymentId UUID платежа.
+ * @returns `/api/payments/:id`
  */
 export function paymentPath(paymentId: string): string {
     return `/api/payments/${encodeURIComponent(paymentId)}`
 }
 
 /**
- * Строит путь симуляций платежа.
- * @param paymentId Идентификатор платежа.
- * @returns Путь запуска симуляций платежа.
+ * POST симуляции исхода. У попытки одна симуляция; другой scenario → 409 PAYMENT_FINALIZED.
+ * @param paymentId UUID уже созданного платежа.
+ * @returns `/api/payments/:id/simulations`
  */
 export function paymentSimulationsPath(paymentId: string): string {
     return `/api/payments/${encodeURIComponent(paymentId)}/simulations`
 }
 
-/** Параметры HTTP-запроса: метод, тело, токен, отмена и ключ идемпотентности. */
+/** `token` → Bearer; `idempotencyKey` только на POST заказа и платежа. cookies не используются. */
 export interface RequestOptions {
     method?: string
     body?: unknown
@@ -84,13 +84,13 @@ export interface RequestOptions {
     idempotencyKey?: string
 }
 
-/** Ответ с заголовками: данные и сырые заголовки ответа. */
+/** Нужен, когда кроме `data` читаем Retry-After или Location (симуляция оплаты). */
 export interface ResponseMeta<T> {
     data: T
     headers: Headers
 }
 
-/** Сырая форма тела ошибки сервера до нормализации. */
+/** Сырое тело ошибки до нормализации: поля могут отсутствовать или быть не строками. */
 interface ErrorPayload {
     error?: {
         code?: unknown
@@ -103,11 +103,11 @@ interface ErrorPayload {
 }
 
 /**
- * Нормализует сырой ответ с ошибкой в ApiError.
- * @param json Распарсенное тело ответа или пустое значение.
- * @param status HTTP-статус ответа.
- * @param requestIdHeader Значение заголовка X-Request-Id, если есть.
- * @returns Нормализованная ошибка ApiError.
+ * Кривой JSON не должен ронять клиент: недостающие поля → UNKNOWN_ERROR и запасной message.
+ * @param json Тело ответа или undefined, если JSON сломан / тела нет.
+ * @param status HTTP-статус; для UI важнее `code`, статус нужен 401/404-гвардам.
+ * @param requestIdHeader X-Request-Id, если в meta его нет.
+ * @returns ApiError с name: 'ApiError' — обычный Error так не выглядит.
  */
 function toApiError(json: unknown, status: number, requestIdHeader?: string): ApiError {
     const payload = (typeof json === 'object' && json !== null ? json : {}) as ErrorPayload
@@ -142,10 +142,9 @@ function toApiError(json: unknown, status: number, requestIdHeader?: string): Ap
 }
 
 /**
- * Разбирает заголовок Retry-After (секунды или HTTP-дата) в миллисекунды.
- * Возвращает null, если заголовка нет или значение некорректно.
- * @param headers Заголовки ответа.
- * @returns Пауза в миллисекундах, ограниченная 250–10000 мс.
+ * Retry-After симуляции оплаты: секунды или HTTP-дата. Прошедшая дата и мусор → null.
+ * @param headers Заголовки ответа createSimulation.
+ * @returns Пауза опроса, зажатая в 250–10000 мс, чтобы не крутить раз в 0 мс и не ждать минуту.
  */
 export function parseRetryAfterMs(headers: Headers): number | null {
     const raw = headers.get('Retry-After')
@@ -167,12 +166,12 @@ export function parseRetryAfterMs(headers: Headers): number | null {
 }
 
 /**
- * Выполняет запрос к API и возвращает поле data вместе с заголовками ответа.
- * Пустой ответ и 204 возвращает как undefined.
- * @param path Путь запроса относительно API_BASE.
- * @param options Метод, тело, токен, сигнал отмены и ключ идемпотентности.
- * @returns Поле data успешного ответа и заголовки.
- * @throws ApiError при невалидном JSON или неуспешном статусе.
+ * fetch + разбор. 204 и пустое тело → `data: undefined`, `response.json()` не вызывается.
+ * Content-Type ставится только если есть body — GET/DELETE без него.
+ * @param path Путь относительно API_BASE, уже с закодированным id.
+ * @param options Без `credentials: include`: токен в заголовке.
+ * @returns `data` успешного JSON и сырые заголовки.
+ * @throws ApiError на не-ok, битом JSON и сетевых ошибках после parse.
  */
 export async function requestWithMeta<T>(path: string, options: RequestOptions = {}): Promise<ResponseMeta<T>> {
     const { method = 'GET', body, token, signal, idempotencyKey } = options
@@ -213,12 +212,11 @@ export async function requestWithMeta<T>(path: string, options: RequestOptions =
 }
 
 /**
- * Выполняет запрос к API и возвращает поле data из ответа.
- * Пустой ответ и 204 возвращает как undefined.
- * @param path Путь запроса относительно API_BASE.
- * @param options Метод, тело, токен, сигнал отмены и ключ идемпотентности.
- * @returns Поле data успешного ответа.
- * @throws ApiError при невалидном JSON или неуспешном статусе.
+ * Как requestWithMeta, но без заголовков. Для симуляции нужен requestWithMeta (Retry-After).
+ * @param path Путь относительно API_BASE.
+ * @param options Те же, что у requestWithMeta.
+ * @returns Только поле `data`.
+ * @throws ApiError — тот же, что requestWithMeta.
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const { data } = await requestWithMeta<T>(path, options)

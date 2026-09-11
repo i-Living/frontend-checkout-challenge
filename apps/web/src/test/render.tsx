@@ -1,5 +1,5 @@
 /**
- * Обёртки рендера для тестов: QueryClient без ретраев и MemoryRouter.
+ * Рендер для тестов. Свой QueryClient на тест, retry: false — иначе 401/404 будут крутиться и таймиться.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { type RenderOptions, render } from '@testing-library/react'
@@ -7,8 +7,8 @@ import type { ReactElement, ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 
 /**
- * Создаёт изолированный QueryClient для одного теста.
- * @returns Клиент без ретраев и без фонового refetch
+ * Новый кэш на тест. gcTime Infinity — данные не уезжают, пока assert ещё идёт.
+ * @returns Клиент без retry и refetchOnWindowFocus
  */
 export function createTestQueryClient(): QueryClient {
     return new QueryClient({
@@ -19,19 +19,19 @@ export function createTestQueryClient(): QueryClient {
     })
 }
 
-/** Опции тестового рендера: маршрут и свой QueryClient. */
+/** route и queryClient вместо wrapper — страницы читают useParams и кэш. */
 interface RenderAppOptions extends Omit<RenderOptions, 'wrapper'> {
-    /** Стартовый путь MemoryRouter. */
+    /** initialEntries MemoryRouter (`/orders/order-1/pay`). */
     route?: string
-    /** Свой клиент, если тесту нужно инспектировать кэш. */
+    /** Свой клиент, если тест смотрит invalidate/кэш. */
     queryClient?: QueryClient
 }
 
 /**
- * Рендерит UI внутри провайдеров приложения, нужных страницам и хукам.
- * @param ui Дерево для рендера
- * @param options Маршрут и QueryClient
- * @returns Результат Testing Library плюс queryClient
+ * MemoryRouter, не BrowserRouter: jsdom без history API для createBrowserRouter.
+ * @param ui Обычно <Routes>…</Routes>, не голая страница без маршрута
+ * @param options route и queryClient
+ * @returns RTL + queryClient этого прогона
  */
 export function renderApp(ui: ReactElement, options: RenderAppOptions = {}) {
     const { route = '/', queryClient = createTestQueryClient(), ...renderOptions } = options

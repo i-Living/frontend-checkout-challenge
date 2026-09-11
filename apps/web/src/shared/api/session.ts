@@ -1,20 +1,20 @@
 /**
- * Сессия клиента: создание, переиспользование и запросы с токеном.
- * Держит один in-flight запрос и восстанавливает сессию после 401.
+ * Гостевая сессия: токен в Zustand/sessionStorage, заголовок Authorization собирает client.ts.
+ * Параллельные вызовы делят один POST. 401 SESSION_* обрабатывается в withSessionRetry, не здесь.
  */
 import { useSessionStore } from '@/shared/store/session-store'
 import type { operations } from './api-types'
 import { API_PATHS, request } from './client'
 
-/** Данные создания сессии из ответа API. */
+/** `data` ответа POST /api/sessions: нужен `token`, не `id` сессии. */
 type CreateSessionData = operations['createSession']['responses'][201]['content']['application/json']['data']
 
-/** Текущий in-flight запрос создания сессии для дедупликации. */
+/** Дедупликация: два getCart на старте не должны создать две сессии и две корзины. */
 let inFlight: Promise<string> | null = null
 
 /**
- * Создаёт новую сессию и сохраняет токен в сторе.
- * @returns Новый токен сессии.
+ * POST /api/sessions `{}` и запись token в стор. Вызывать только из ensureSession.
+ * @returns Токен для Authorization; это не session id.
  */
 async function createSession(): Promise<string> {
     const data = await request<CreateSessionData>(API_PATHS.sessions, { method: 'POST', body: {} })
@@ -23,10 +23,9 @@ async function createSession(): Promise<string> {
 }
 
 /**
- * Возвращает существующий токен или создаёт сессию один раз на всех вызывающих.
- * Ждёт регидратации persist-стора, чтобы после F5 не создать новую сессию
- * поверх сохранённого токена (и не потерять корзину).
- * @returns Токен текущей сессии.
+ * Берёт токен из стора или создаёт сессию один раз на всех вызывающих.
+ * Ждёт гидратации persist: иначе F5 увидит пустой стор, создаст новый токен и потеряет корзину.
+ * @returns Токен текущей вкладки.
  */
 export async function ensureSession(): Promise<string> {
     if (!useSessionStore.persist.hasHydrated()) {

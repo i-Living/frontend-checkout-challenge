@@ -1,5 +1,5 @@
 /**
- * Примитив алерта shadcn: баннер для ошибок и статусов с заголовком и описанием.
+ * Баннер статуса. role=alert — скринридер прочитает сразу; не дублировать тем же текстом aria-live рядом.
  */
 import type { VariantProps } from 'class-variance-authority'
 import { cva } from 'class-variance-authority'
@@ -23,7 +23,7 @@ const alertVariants = cva(
 )
 
 /**
- * Баннер уведомления с ролью alert (например ошибка оплаты или статус заказа).
+ * Корень баннера. destructive — ошибка, default — нейтральный статус (отмена оплаты).
  */
 function Alert({ className, variant, ...props }: ComponentProps<'div'> & VariantProps<typeof alertVariants>) {
     return <div data-slot='alert' role='alert' className={cn(alertVariants({ variant }), className)} {...props} />

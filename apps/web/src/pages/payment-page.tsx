@@ -1,6 +1,6 @@
 /**
- * Экран оплаты (`/orders/:orderId/pay`).
- * Отвечает за тестовые карты, создание попытки оплаты, симуляцию, опрос статуса и повторы.
+ * `/orders/:orderId/pay`. Карта: sandbox + попытка + поллинг. Наличные сюда не пускаем.
+ * «Отменить» закрывает форму до «Оплатить»; ушедшую в банк попытку API не отменяет.
  */
 import { useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, Info, LoaderCircle } from 'lucide-react'
@@ -21,7 +21,7 @@ import { queryGate } from '@/shared/ui/query-gate'
 import { Skeleton } from '@/shared/ui/skeleton'
 
 /**
- * Скелетон экрана оплаты.
+ * Пока GET заказа/sandbox. Не показывать карты-заглушки с выдуманными масками.
  */
 function PaymentSkeleton() {
     return (
@@ -34,10 +34,9 @@ function PaymentSkeleton() {
 }
 
 /**
- * Экран оплаты (`/orders/:orderId/pay`): выбор тестовой карты, запуск и отмена попытки.
- * Параметр orderId — через useParams, пропсов нет. Ветки: восстановление id, скелетоны,
- * редиректы для не-карты/оплаченного, decline/cancel/in-progress/finalized.
- * @returns Разметка страницы оплаты
+ * Resume: попытка из стора, иначе pending/processing из списка, иначе новая. Успех — редирект
+ * только после payment.status=succeeded, не после 201 createPayment.
+ * @returns Страница оплаты
  */
 export function PaymentPage() {
     usePageTitle('Оплата заказа')
@@ -170,7 +169,7 @@ export function PaymentPage() {
     const selectedCard = sandboxCards.find((card) => card.id === selectedCardId) ?? null
 
     /**
-     * Запускает новую попытку оплаты по выбранной карте.
+     * Сценарий берётся с выбранной карты sandbox, не хардкодится. Пока processing — выход.
      */
     function handlePay() {
         if (!selectedCard || isProcessing) {
@@ -180,7 +179,7 @@ export function PaymentPage() {
     }
 
     /**
-     * Закрывает форму без оплаты: новая попытка со сценарием cancel.
+     * cancel до «Оплатить». Во время processing кнопка disabled — у попытки одна симуляция.
      */
     function handleCancel() {
         if (attempt.isPending || isTerminal || isProcessing) {

@@ -1,5 +1,6 @@
 /**
- * Общая подготовка Vitest: матчеры Testing Library, полифиллы jsdom и сброс стора.
+ * setupFiles Vitest. Сброс session-store и storage между тестами — иначе токен/черновик утекает в соседний it.
+ * matchMedia/pointer capture/ResizeObserver — jsdom их не умеет, Radix без полифиллов падает.
  */
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'

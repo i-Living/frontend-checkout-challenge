@@ -1,11 +1,12 @@
 /**
- * Провайдеры приложения: общий QueryClient и корневая обёртка Providers.
+ * QueryClient на модуле, не в стейте: StrictMode не должен создавать второй кэш и дублировать запросы.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 
 /**
- * Общий клиент React Query с дефолтными настройками запросов и мутаций.
+ * queries retry=1, mutations retry=0: повтор POST заказа/платежа без ключа создал бы дубликат.
+ * refetchOnWindowFocus выключен — quote и оплата не должны уходить сами при возврате на вкладку.
  */
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -15,10 +16,9 @@ const queryClient = new QueryClient({
 })
 
 /**
- * Корневая обёртка провайдеров приложения.
- * @param props - Пропсы обёртки
- * @param props.children - Дочернее дерево приложения
- * @returns Дерево внутри QueryClientProvider
+ * Только QueryClientProvider. Роутер снаружи — ему не нужен этот клиент в конструкторе.
+ * @param props.children Дерево приложения
+ * @returns Дети внутри провайдера
  */
 export function Providers({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>

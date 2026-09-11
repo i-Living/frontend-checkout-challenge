@@ -1,16 +1,17 @@
 /**
- * Поле формы: подпись, контрол и ошибка, связанные через id / aria.
+ * Поле формы: подпись, контрол и ошибка через id / aria.
+ * Ребёнок должен быть один — cloneElement вешает id на него, не на обёртку.
  */
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { Label } from '@/shared/ui/label'
 
 /**
- * Оборачивает контрол подписью и текстом ошибки.
- * Прокидывает id, aria-invalid и aria-describedby в единственного ребёнка.
- * @param id Идентификатор контрола и htmlFor подписи.
- * @param label Текст подписи.
- * @param error Сообщение ошибки или пусто.
- * @param children Один контрол (Input, select, …).
+ * Клонирует ребёнка и ставит id, aria-invalid, aria-describedby.
+ * Без этого Label htmlFor и текст ошибки не связаны с контролом.
+ * @param id Общий id контрола и htmlFor; ошибка живёт на `${id}-error`.
+ * @param label Видимая подпись. Не дублировать placeholder'ом.
+ * @param error Текст под полем; пусто — aria-invalid=false и без describedby.
+ * @param children Ровно один Input/select. Фрагмент или два узла сломают cloneElement.
  */
 export function FormField({
     id,

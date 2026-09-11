@@ -1,22 +1,24 @@
 /**
- * Ключи идемпотентности для заказов и платежей.
- * Переиспользует ключ при повторе того же тела, иначе генерирует новый.
+ * Ключи идемпотентности заказа и платежа.
+ * Повтор сети (потеря ответа, двойной клик) — то же тело и тот же ключ.
+ * Новая попытка (другое тело, decline/cancel, IDEMPOTENCY_CONFLICT) — новый ключ.
  */
 import { v4 as uuidv4 } from 'uuid'
 import { useSessionStore } from '@/shared/store/session-store'
 
 /**
- * Генерирует новый уникальный ключ идемпотентности.
- * @returns Случайный UUID-ключ.
+ * Новый UUID. API принимает 8–128 символов `[A-Za-z0-9_-]`; UUID в этот набор входит.
+ * @returns Ключ, который ещё не отправляли с другим телом.
  */
 export function newIdempotencyKey(): string {
     return uuidv4()
 }
 
 /**
- * Возвращает сохранённый ключ заказа для того же тела или создаёт новый.
- * @param body Тело запроса создания заказа для сравнения.
- * @returns Ключ идемпотентности заказа.
+ * Тот же JSON тела — тот же ключ (безопасный повтор). Другое тело — новый ключ,
+ * иначе сервер ответит 409 IDEMPOTENCY_CONFLICT.
+ * @param body Тело POST /api/orders; сравнение через JSON.stringify, порядок ключей должен совпадать.
+ * @returns Ключ, который кладётся в заголовок Idempotency-Key.
  */
 export function getOrCreateOrderKey(body: unknown): string {
     const { lastOrder, setLastOrder } = useSessionStore.getState()
@@ -30,10 +32,10 @@ export function getOrCreateOrderKey(body: unknown): string {
 }
 
 /**
- * Возвращает сохранённый ключ платежа для того же заказа и тела или создаёт новый.
- * @param orderId Идентификатор заказа.
- * @param body Тело запроса создания платежа для сравнения.
- * @returns Ключ идемпотентности платежа.
+ * Как у заказа, плюс привязка к orderId: ключ чужого заказа не переиспользуем.
+ * @param orderId Заказ, для которого создаём попытку.
+ * @param body Тело POST .../payments (у нас всегда `{}`).
+ * @returns Ключ Idempotency-Key этой попытки.
  */
 export function getOrCreatePaymentKey(orderId: string, body: unknown): string {
     const { lastPayment, setLastPayment } = useSessionStore.getState()
@@ -47,14 +49,14 @@ export function getOrCreatePaymentKey(orderId: string, body: unknown): string {
 }
 
 /**
- * Сбрасывает сохранённый ключ заказа после успешной попытки.
+ * После успешного создания заказа. Если не сбросить, следующая покупка уйдёт со старым ключом.
  */
 export function clearOrderKey(): void {
     useSessionStore.getState().setLastOrder(null)
 }
 
 /**
- * Сбрасывает сохранённый ключ платежа после успешной попытки.
+ * После успешного создания платежа или PAYMENT_FINALIZED (нужен новый ключ на «Оплатить снова»).
  */
 export function clearPaymentKey(): void {
     useSessionStore.getState().setLastPayment(null)

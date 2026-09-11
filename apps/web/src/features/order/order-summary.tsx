@@ -1,22 +1,22 @@
 /**
- * Краткая сводка заказа: позиции, доставка и итоги.
+ * Сводка заказа с сервера. Итоги не пересчитывать: subtotal/shipping/total уже в order.
  */
 import type { Order } from '@/shared/api/endpoints'
 import { useCheckoutOptions } from '@/shared/api/queries'
 import { formatMoney } from '@/shared/lib/money'
 
 /**
- * Пропсы сводки заказа.
- * @property order заказ с сервера для отображения
+ * Пропсы сводки.
+ * @property order GET заказа; quote после создания заказа уже не актуален
  */
 interface OrderSummaryProps {
     order: Order
 }
 
 /**
- * Формирует строку доставки: самовывоз или адрес курьера.
- * @param order заказ с сервера
- * @param pickupTitle название пункта выдачи из опций checkout (если известно)
+ * Самовывоз без названия пункта — запасной текст с id, пока options не загрузились.
+ * @param order Заказ
+ * @param pickupTitle «Центр — Учебная, 1» из options, не сырой pickupPointId
  */
 function deliveryText(order: Order, pickupTitle?: string): string {
     if (order.delivery.method === 'pickup') {
@@ -28,8 +28,8 @@ function deliveryText(order: Order, pickupTitle?: string): string {
 }
 
 /**
- * Сводка заказа: позиции, способ доставки и итоги.
- * @param order заказ с сервера для отображения
+ * Название пункта — из GET options (staleTime 60s), не из id в заказе.
+ * @param order Заказ с сервера
  */
 export function OrderSummary({ order }: OrderSummaryProps) {
     // Название пункта выдачи — только из API, сырой id не показываем без подписи.

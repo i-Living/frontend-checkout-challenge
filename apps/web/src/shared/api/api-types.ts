@@ -1,6 +1,6 @@
 /**
- * Реэкспорт типов OpenAPI из сгенерированного файла.
- * Точка входа для типов $defs, components, operations, paths и webhooks.
+ * Типы OpenAPI. Импортировать отсюда, не из generated.d.ts — тот файл перезаписывает
+ * `npm run generate:api-types` и руками не редактируется.
  */
-/** Реэкспорт сгенерированных типов OpenAPI для всего приложения. */
+/** Реэкспорт сгенерированных paths/operations: ручные DTO ответов API не заводим. */
 export type { $defs, components, operations, paths, webhooks } from './generated'

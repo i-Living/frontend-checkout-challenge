@@ -1,12 +1,12 @@
 /**
- * Примитив label на Radix: подпись поля формы, связанная с инпутом.
+ * Подпись поля. Связь с контролом — htmlFor, не обёртка вокруг input (иначе ломается cloneElement в FormField).
  */
 import * as LabelPrimitive from '@radix-ui/react-label'
 import type { ComponentProps } from 'react'
 import { cn } from '@/shared/lib/cn'
 
 /**
- * Подпись поля формы (связывается с инпутом через htmlFor).
+ * Radix Label. htmlFor должен совпасть с id контрола, который ставит FormField.
  */
 function Label({ className, ...props }: ComponentProps<typeof LabelPrimitive.Root>) {
     return (

@@ -1,6 +1,6 @@
-﻿/**
- * Типизированные эндпоинты API поверх request с авторизацией по сессии.
- * Содержит типы данных и функции запросов каталога, корзины, расчётов, заказов и платежей.
+/**
+ * Типизированные эндпоинты поверх request. Типы — из OpenAPI, не ручные DTO.
+ * Каталог и sandbox без токена; остальное — withSessionRetry (повтор на 401 SESSION_*).
  */
 import { useSessionStore } from '@/shared/store/session-store'
 import type { operations, paths } from './api-types'
@@ -20,7 +20,7 @@ import {
 import { isInvalidSessionError } from './errors'
 import { ensureSession } from './session'
 
-/** Прямой доступ к типам путей OpenAPI. */
+/** Прямой доступ к paths OpenAPI, если нужен литерал пути вне этого модуля. */
 export type ApiPaths = paths
 
 /** Список товаров из ответа каталога. */
@@ -49,7 +49,7 @@ export type OrderList = operations['listOrders']['responses'][200]['content']['a
 export type Payment = operations['getPayment']['responses'][200]['content']['application/json']['data']
 /** Список платежей заказа. */
 export type PaymentList = operations['listPayments']['responses'][200]['content']['application/json']['data']
-/** Симуляция исхода платежа в песочнице (ответы 200/201/202 имеют одинаковую форму data). */
+/** Симуляция исхода платежа: 200/201/202 имеют одну форму data. */
 export type Simulation =
     | operations['createSimulation']['responses'][200]['content']['application/json']['data']
     | operations['createSimulation']['responses'][201]['content']['application/json']['data']
@@ -66,8 +66,8 @@ export type SimulationScenario =
 export type Sandbox = operations['getSandbox']['responses'][200]['content']['application/json']['data']
 
 /**
- * Повторяет запрос с новым токеном после SESSION_REQUIRED / SESSION_INVALID.
- * @param run Функция запроса, принимающая токен.
+ * Один повтор с новым токеном на SESSION_REQUIRED / SESSION_INVALID. Другие ошибки не ретраим.
+ * @param run Запрос, который заново получит свежий token.
  */
 async function withSessionRetry<T>(run: (token: string) => Promise<T>): Promise<T> {
     const token = await ensureSession()
@@ -84,23 +84,22 @@ async function withSessionRetry<T>(run: (token: string) => Promise<T>): Promise<
 }
 
 /**
- * Выполняет запрос с токеном сессии и повторяет его после 401 с новой сессией.
- * @param path Путь запроса относительно API_BASE.
- * @param options Параметры запроса без токена.
- * @returns Поле data успешного ответа.
- * @throws ApiError при неуспешном статусе после повтора.
+ * Авторизованный запрос. Токен подставляет ensureSession, страницы его не передают.
+ * @param path Путь относительно API_BASE.
+ * @param options Без поля token.
+ * @returns Поле data.
+ * @throws ApiError после возможного одного повтора на 401 сессии.
  */
 async function withAuth<T>(path: string, options: Omit<RequestOptions, 'token'> = {}): Promise<T> {
     return withSessionRetry((token) => request<T>(path, { ...options, token }))
 }
 
 /**
- * Выполняет запрос с токеном сессии и повторяет его после 401 с новой сессией.
- * Возвращает данные вместе с заголовками ответа (нужны Retry-After/Location).
- * @param path Путь запроса относительно API_BASE.
- * @param options Параметры запроса без токена.
- * @returns Поле data успешного ответа и заголовки.
- * @throws ApiError при неуспешном статусе после повтора.
+ * Как withAuth, плюс заголовки. Нужен createSimulation (Retry-After).
+ * @param path Путь относительно API_BASE.
+ * @param options Без поля token.
+ * @returns data и headers.
+ * @throws ApiError после возможного одного повтора на 401 сессии.
  */
 async function withAuthMeta<T>(
     path: string,
@@ -110,8 +109,8 @@ async function withAuthMeta<T>(
 }
 
 /**
- * Загружает список товаров каталога.
- * @param signal Сигнал отмены запроса.
+ * Каталог без Authorization. Не ходить в withAuth — лишний POST сессии.
+ * @param signal Отмена Query.
  * @returns Список товаров.
  */
 export function listProducts(signal?: AbortSignal): Promise<ProductList> {
@@ -119,37 +118,37 @@ export function listProducts(signal?: AbortSignal): Promise<ProductList> {
 }
 
 /**
- * Загружает корзину текущей сессии.
- * @param signal Сигнал отмены запроса.
- * @returns Корзина сессии.
+ * Корзина текущей сессии. Пустой items — норма, не 404.
+ * @param signal Отмена Query.
+ * @returns Корзина и version для quote.
  */
 export function getCart(signal?: AbortSignal): Promise<Cart> {
     return withAuth<Cart>(API_PATHS.cart, { signal })
 }
 
 /**
- * Устанавливает абсолютное количество товара в корзине.
- * @param productId Идентификатор товара.
- * @param quantity Новое абсолютное количество.
- * @param signal Сигнал отмены запроса.
- * @returns Обновлённая позиция корзины.
+ * Абсолютное количество: повтор PUT {quantity:1} не добавляет вторую штуку и не меняет version.
+ * @param productId Id товара из каталога.
+ * @param quantity Новое число, не дельта.
+ * @param signal Отмена мутации.
+ * @returns Обновлённая позиция.
  */
 export function setCartItem(productId: string, quantity: number, signal?: AbortSignal): Promise<CartItem> {
     return withAuth<CartItem>(cartItemPath(productId), { method: 'PUT', body: { quantity }, signal })
 }
 
 /**
- * Удаляет товар из корзины.
- * @param productId Идентификатор товара.
- * @param signal Сигнал отмены запроса.
+ * DELETE идемпотентен: повтор на уже удалённой позиции — 204, не ошибка.
+ * @param productId Id товара.
+ * @param signal Отмена мутации.
  */
 export function removeCartItem(productId: string, signal?: AbortSignal): Promise<void> {
     return withAuth<void>(cartItemPath(productId), { method: 'DELETE', signal })
 }
 
 /**
- * Загружает доступные опции доставки и оплаты.
- * @param signal Сигнал отмены запроса.
+ * Подписи и пункты выдачи с сервера. Title доставки/оплаты не хардкодить.
+ * @param signal Отмена Query.
  * @returns Опции checkout.
  */
 export function getCheckoutOptions(signal?: AbortSignal): Promise<CheckoutOptions> {
@@ -157,20 +156,20 @@ export function getCheckoutOptions(signal?: AbortSignal): Promise<CheckoutOption
 }
 
 /**
- * Создаёт расчёт с ценами для версии корзины.
- * @param cartVersion Версия корзины для привязки расчёта.
- * @param delivery Данные доставки.
- * @param signal Сигнал отмены запроса.
- * @returns Новый расчёт.
+ * Расчёт привязан к cartVersion и живёт 10 минут. Смена корзины/доставки — новый POST, не патч.
+ * @param cartVersion version из GET /api/cart.
+ * @param delivery Самовывоз с пунктом или курьер с адресом.
+ * @param signal Отмена Query; смена ключа abort'ит старый POST.
+ * @returns Новый расчёт; суммы для UI только отсюда.
  */
 export function createQuote(cartVersion: number, delivery: CreateQuoteDelivery, signal?: AbortSignal): Promise<Quote> {
     return withAuth<Quote>(API_PATHS.quotes, { method: 'POST', body: { cartVersion, delivery }, signal })
 }
 
 /**
- * Загружает расчёт по идентификатору.
- * @param id Идентификатор расчёта.
- * @param signal Сигнал отмены запроса.
+ * Чтение сохранённого расчёта. На чекауте обычно хватает ответа createQuote.
+ * @param id UUID расчёта.
+ * @param signal Отмена Query.
  * @returns Расчёт.
  */
 export function getQuote(id: string, signal?: AbortSignal): Promise<Quote> {
@@ -178,19 +177,20 @@ export function getQuote(id: string, signal?: AbortSignal): Promise<Quote> {
 }
 
 /**
- * Создаёт заказ с ключом идемпотентности.
- * @param body Тело заказа с расчётом и контактами.
- * @param key Ключ идемпотентности для безопасного ретрая.
- * @param signal Сигнал отмены запроса.
- * @returns Созданный заказ.
+ * Создание заказа. Повтор сети — тот же body и Idempotency-Key; новая попытка — новый ключ.
+ * Успех 201 не значит «оплачено»: статус смотрим GET заказа.
+ * @param body quoteId, способ оплаты, контакты.
+ * @param key 8–128 символов `[A-Za-z0-9_-]`.
+ * @param signal Отмена мутации.
+ * @returns Созданный заказ; корзина на сервере после этого пустая.
  */
 export function createOrder(body: CreateOrderBody, key: string, signal?: AbortSignal): Promise<Order> {
     return withAuth<Order>(API_PATHS.orders, { method: 'POST', body, idempotencyKey: key, signal })
 }
 
 /**
- * Загружает список заказов сессии.
- * @param signal Сигнал отмены запроса.
+ * Заказы сессии, новые первыми. Нужен, если orderId потеряли после F5.
+ * @param signal Отмена Query.
  * @returns Список заказов.
  */
 export function listOrders(signal?: AbortSignal): Promise<OrderList> {
@@ -198,19 +198,19 @@ export function listOrders(signal?: AbortSignal): Promise<OrderList> {
 }
 
 /**
- * Загружает заказ по идентификатору.
- * @param orderId Идентификатор заказа.
- * @param signal Сигнал отмены запроса.
- * @returns Заказ.
+ * Источник истины для страницы успеха. Не подменять 201 создания или succeeded платежа.
+ * @param orderId UUID заказа.
+ * @param signal Отмена Query.
+ * @returns Заказ и paymentStatus.
  */
 export function getOrder(orderId: string, signal?: AbortSignal): Promise<Order> {
     return withAuth<Order>(orderPath(orderId), { signal })
 }
 
 /**
- * Загружает платежи заказа.
- * @param orderId Идентификатор заказа.
- * @param signal Сигнал отмены запроса.
+ * Попытки заказа, новые первыми. Resume pending/processing после перезагрузки.
+ * @param orderId UUID заказа.
+ * @param signal Отмена Query.
  * @returns Список платежей заказа.
  */
 export function listPayments(orderId: string, signal?: AbortSignal): Promise<PaymentList> {
@@ -218,20 +218,20 @@ export function listPayments(orderId: string, signal?: AbortSignal): Promise<Pay
 }
 
 /**
- * Создаёт платёж по заказу с ключом идемпотентности.
- * @param orderId Идентификатор заказа.
- * @param key Ключ идемпотентности для безопасного ретрая.
- * @param signal Сигнал отмены запроса.
- * @returns Созданный платёж.
+ * Новая попытка. Тело всегда `{}`. Ключ как у заказа: повтор сети / новая попытка.
+ * @param orderId UUID заказа.
+ * @param key Idempotency-Key этой попытки.
+ * @param signal Отмена мутации.
+ * @returns Созданный платёж в pending.
  */
 export function createPayment(orderId: string, key: string, signal?: AbortSignal): Promise<Payment> {
     return withAuth<Payment>(orderPaymentsPath(orderId), { method: 'POST', body: {}, idempotencyKey: key, signal })
 }
 
 /**
- * Загружает платёж по идентификатору для опроса статуса.
- * @param paymentId Идентификатор платежа.
- * @param signal Сигнал отмены запроса.
+ * Чтение попытки для поллинга. Decline — HTTP 200 + status=failed, не throw.
+ * @param paymentId UUID платежа.
+ * @param signal Отмена Query; уход со страницы должен abort'ить.
  * @returns Платёж.
  */
 export function getPayment(paymentId: string, signal?: AbortSignal): Promise<Payment> {
@@ -239,11 +239,12 @@ export function getPayment(paymentId: string, signal?: AbortSignal): Promise<Pay
 }
 
 /**
- * Запускает симуляцию исхода платежа в песочнице.
- * @param paymentId Идентификатор платежа.
- * @param scenario Сценарий симуляции.
- * @param signal Сигнал отмены запроса.
- * @returns Созданная симуляция и серверная пауза Retry-After в мс.
+ * Запуск сценария песочницы. Пауза опроса — Retry-After, не константа. Вторая симуляция с другим
+ * scenario → 409 PAYMENT_FINALIZED.
+ * @param paymentId UUID платежа.
+ * @param scenario Сценарий выбранной тестовой карты или cancel.
+ * @param signal Отмена мутации.
+ * @returns Симуляция и retryAfterMs (null, если заголовка нет).
  */
 export function createSimulation(
     paymentId: string,
@@ -258,9 +259,9 @@ export function createSimulation(
 }
 
 /**
- * Загружает данные песочницы: тестовые карты и сценарии.
- * @param signal Сигнал отмены запроса.
- * @returns Данные песочницы.
+ * Тестовые карты без токена. В форму идут title и maskedNumber, не PAN/CVC.
+ * @param signal Отмена Query.
+ * @returns Карты и settlementDelayMs.
  */
 export function getSandbox(signal?: AbortSignal): Promise<Sandbox> {
     return request<Sandbox>(API_PATHS.sandbox, { signal })

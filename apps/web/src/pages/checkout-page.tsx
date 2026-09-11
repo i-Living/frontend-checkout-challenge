@@ -1,6 +1,5 @@
 /**
- * Экран оформления (`/checkout`).
- * Отвечает за форму checkout, расчёт доставки (quote), создание заказа и навигацию к оплате.
+ * `/checkout`. Quote и заказ. Пустая корзина → редирект на /cart. Суммы только из quote, не из корзины.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, LoaderCircle } from 'lucide-react'
@@ -25,7 +24,7 @@ import { queryGate } from '@/shared/ui/query-gate'
 import { Skeleton } from '@/shared/ui/skeleton'
 
 /**
- * Скелетон формы оформления.
+ * Две колонки как у готовой страницы, чтобы сайдбар «Итого» не прыгал.
  */
 function CheckoutSkeleton() {
     return (
@@ -42,9 +41,8 @@ function CheckoutSkeleton() {
 }
 
 /**
- * Экран оформления (`/checkout`): форма покупателя и доставки плюс сайдбар с итогом.
- * Пропсов нет. Ветки: скелетон, ошибка загрузки, редирект при пустой корзине, форма + quote.
- * @returns Разметка страницы оформления
+ * Черновик в session-store: ошибка API и F5 не стирают поля. Адрес для quote дебаунсится 300 мс.
+ * @returns Страница оформления
  */
 export function CheckoutPage() {
     usePageTitle('Оформление заказа')
@@ -143,8 +141,8 @@ export function CheckoutPage() {
     })
 
     /**
-     * Обновляет черновик и сбрасывает ошибки по затронутым полям.
-     * @param patch Частичное обновление черновика
+     * Смена deliveryMethod сбрасывает ошибки адреса и пункта вместе: они взаимоисключающие.
+     * @param patch Часть черновика
      */
     function handleDraftChange(patch: Partial<CheckoutDraft>) {
         patchDraft(patch)
@@ -176,8 +174,8 @@ export function CheckoutPage() {
     }
 
     /**
-     * Валидирует форму и создаёт заказ по текущему quote с ключом идемпотентности.
-     * @param validData Актуальный черновик из формы
+     * Без quote — refetch расчёта, заказ не создаём. Ключ от тела: двойной клик не сделает второй заказ.
+     * @param validData Черновик на момент submit (тот же, что в сторе)
      */
     function handleSubmit(validData: CheckoutDraft) {
         const validation = validateDraft(validData)

@@ -1,73 +1,73 @@
 /**
- * Инвалидация кэша Query по сущностям API.
- * Страницы и хуки не собирают queryKey вручную.
+ * Сброс кэша по сущности. Страницы не вызывают invalidateQueries с сырым массивом —
+ * иначе разъедется с query-keys.ts.
  */
 import type { QueryClient } from '@tanstack/react-query'
 import { keys } from './query-keys'
 
 /**
- * Сбрасывает кэш корзины.
- * @param queryClient Клиент TanStack Query.
+ * Только корзина. Каталог не трогает: после удаления позиции остаток в карточке устареет.
+ * @param queryClient Кэш приложения, не тестовый, если зовём из страницы.
  */
 export function invalidateCart(queryClient: QueryClient): Promise<void> {
     return queryClient.invalidateQueries({ queryKey: keys.cart })
 }
 
 /**
- * Сбрасывает кэш каталога.
- * @param queryClient Клиент TanStack Query.
+ * Только каталог. Один не вызывать после смены корзины — см. invalidateCartAndProducts.
+ * @param queryClient Кэш Query.
  */
 export function invalidateProducts(queryClient: QueryClient): Promise<void> {
     return queryClient.invalidateQueries({ queryKey: keys.products })
 }
 
 /**
- * Сбрасывает корзину и каталог вместе (остаток в карточках зависит от корзины).
- * @param queryClient Клиент TanStack Query.
+ * Корзина и каталог вместе: карточки показывают остаток, он зависит от состава корзины.
+ * @param queryClient Кэш Query.
  */
 export async function invalidateCartAndProducts(queryClient: QueryClient): Promise<void> {
     await Promise.all([invalidateCart(queryClient), invalidateProducts(queryClient)])
 }
 
 /**
- * Сбрасывает кэш всех расчётов (префикс quote).
- * @param queryClient Клиент TanStack Query.
+ * Все расчёты: `keys.quote()` без id — префикс, не один UUID.
+ * @param queryClient Кэш Query.
  */
 export function invalidateQuotes(queryClient: QueryClient): Promise<void> {
     return queryClient.invalidateQueries({ queryKey: keys.quote() })
 }
 
 /**
- * Сбрасывает заказ.
- * @param queryClient Клиент TanStack Query.
- * @param orderId Идентификатор заказа.
+ * Один заказ. После терминальной оплаты, чтобы страница успеха не показала старый awaiting_payment.
+ * @param queryClient Кэш Query.
+ * @param orderId UUID заказа из маршрута.
  */
 export function invalidateOrder(queryClient: QueryClient, orderId: string): Promise<void> {
     return queryClient.invalidateQueries({ queryKey: keys.order(orderId) })
 }
 
 /**
- * Сбрасывает список попыток оплаты заказа.
- * @param queryClient Клиент TanStack Query.
- * @param orderId Идентификатор заказа.
+ * Список попыток заказа — resume pending/processing после F5.
+ * @param queryClient Кэш Query.
+ * @param orderId UUID заказа, не платежа.
  */
 export function invalidatePayments(queryClient: QueryClient, orderId: string): Promise<void> {
     return queryClient.invalidateQueries({ queryKey: keys.payments(orderId) })
 }
 
 /**
- * Сбрасывает одну попытку оплаты.
- * @param queryClient Клиент TanStack Query.
- * @param paymentId Идентификатор платежа.
+ * Одна попытка — чтобы поллинг подхватил новый status.
+ * @param queryClient Кэш Query.
+ * @param paymentId UUID платежа.
  */
 export function invalidatePayment(queryClient: QueryClient, paymentId: string): Promise<void> {
     return queryClient.invalidateQueries({ queryKey: keys.payment(paymentId) })
 }
 
 /**
- * Сбрасывает заказ и его попытки оплаты.
- * @param queryClient Клиент TanStack Query.
- * @param orderId Идентификатор заказа.
+ * Заказ и его попытки после succeeded/failed/cancelled или ORDER_ALREADY_PAID.
+ * @param queryClient Кэш Query.
+ * @param orderId UUID заказа.
  */
 export async function invalidateOrderAndPayments(queryClient: QueryClient, orderId: string): Promise<void> {
     await Promise.all([invalidateOrder(queryClient, orderId), invalidatePayments(queryClient, orderId)])

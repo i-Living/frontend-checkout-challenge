@@ -1,5 +1,5 @@
 /**
- * Строка корзины с изменением количества и удалением позиции.
+ * Строка корзины. Количество на сервер — абсолютное; локальный draft не шлётся, пока не blur/Enter.
  */
 import { Minus, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -10,20 +10,20 @@ import { Input } from '@/shared/ui/input'
 import { Label } from '@/shared/ui/label'
 
 /**
- * Позиция корзины из API.
+ * Элемент cart.items. lineTotal и unitPrice — с сервера, не считать на клиенте.
  */
 type CartLineItem = Cart['items'][number]
 
 /**
  * Пропсы строки корзины.
- * @property item позиция корзины
- * @property onQuantity обработчик смены количества (абсолютное значение)
- * @property onRemove обработчик удаления позиции
- * @property isPending блокировка контролов на время запроса
+ * @property item Позиция из GET /api/cart, не из каталога
+ * @property onQuantity Абсолютное quantity на PUT, не дельта
+ * @property onRemove DELETE позиции
+ * @property isPending Блокировка этой строки, не всей корзины
  */
 interface CartLineProps {
     item: CartLineItem
-    /** Остаток товара на складе для ограничения количества (по умолчанию 99). */
+    /** Остаток из каталога. Нет в корзине API; 99 — запасной потолок, лучше передать stock. */
     stock?: number
     onQuantity: (absolute: number) => void
     onRemove: () => void
@@ -31,12 +31,12 @@ interface CartLineProps {
 }
 
 /**
- * Строка корзины: название, цена, степпер количества и удаление.
- * @param item позиция корзины
- * @param stock остаток товара для ограничения количества
- * @param onQuantity обработчик смены количества (абсолютное значение)
- * @param onRemove обработчик удаления позиции
- * @param isPending блокировка контролов на время запроса
+ * Степпер и input type=number. Значение фиксируется на blur/Enter и клампится в 1…stock.
+ * @param item Позиция корзины
+ * @param stock Остаток; плюс disabled на верхней границе
+ * @param onQuantity Абсолютное число после клампа
+ * @param onRemove Удаление
+ * @param isPending Блок кнопок и input на время PUT/DELETE этой строки
  */
 export function CartLine({ item, stock = 99, onQuantity, onRemove, isPending }: CartLineProps) {
     const inputId = `cart-qty-${item.productId}`
@@ -48,8 +48,8 @@ export function CartLine({ item, stock = 99, onQuantity, onRemove, isPending }: 
     }, [item.quantity])
 
     /**
-     * Проверяет и фиксирует введенное количество, приводит к диапазону 1–остаток.
-     * @param value введенное количество
+     * NaN → откат к item.quantity без запроса. То же число, что уже в корзине — PUT не шлём.
+     * @param value valueAsNumber инпута
      */
     function commit(value: number) {
         if (!Number.isFinite(value)) {

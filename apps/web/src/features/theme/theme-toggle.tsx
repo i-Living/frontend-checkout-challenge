@@ -1,14 +1,13 @@
 /**
- * Переключатель темы оформления в шапке приложения.
+ * Тоггл темы в шапке. Состояние в localStorage, не в session-store — тема не привязана к корзине.
  */
 import { Moon, Sun } from 'lucide-react'
 import { useThemeStore } from '@/shared/store/theme-store'
 import { Button } from '@/shared/ui/button'
 
 /**
- * Кнопка-тоггл светлой/тёмной темы с иконкой текущего состояния.
- * Доступна с клавиатуры, состояние озвучено через aria-label и aria-pressed.
- * @returns Кнопка переключения темы.
+ * aria-pressed = тёмная тема сейчас. Иконка — противоположное действие (луна → «включить тёмную»).
+ * @returns Кнопка size=icon, 44px по минимуму кнопки.
  */
 export function ThemeToggle() {
     const theme = useThemeStore((state) => state.theme)

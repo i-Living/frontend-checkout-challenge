@@ -1,11 +1,11 @@
 /**
- * Выбор тестовой карты для оплаты заказа.
+ * Выбор тестовой карты. В UI только title и maskedNumber из sandbox, без PAN/CVC.
  */
 import type { Sandbox } from '@/shared/api/endpoints'
 import { OptionRadioGroup } from '@/shared/ui/option-radio-group'
 
 /**
- * Пропсы выбора тестовой карты.
+ * Карты приходят с GET /api/sandbox. Сценарий оплаты берёт страница из выбранной карты.
  */
 interface CardPickerProps {
     cards: Sandbox['cards']
@@ -15,7 +15,7 @@ interface CardPickerProps {
 }
 
 /**
- * Радио-список тестовых карт песочницы.
+ * description = маска (`•••• 4242`). disabled на время processing, чтобы не сменить сценарий под запросом.
  */
 export function CardPicker({ cards, selectedId, onSelect, disabled = false }: CardPickerProps) {
     return (

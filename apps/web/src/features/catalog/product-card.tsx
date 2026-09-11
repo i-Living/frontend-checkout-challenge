@@ -1,5 +1,5 @@
 /**
- * Карточка товара каталога с ценой, остатком и управлением количеством в корзине.
+ * Карточка каталога. Количество в корзине приходит снаружи — карточка не ходит в API сама.
  */
 import { Minus, PackageX, Plus, ShoppingCart, Trash2 } from 'lucide-react'
 import type { Product } from '@/shared/api/endpoints'
@@ -10,12 +10,12 @@ import { ProductVisual } from './product-visual'
 
 /**
  * Пропсы карточки товара.
- * @property product товар для отображения
- * @property quantityInCart количество товара уже в корзине (0 — ещё не добавлен)
- * @property onAdd обработчик добавления первой единицы в корзину
- * @property onQuantity обработчик установки абсолютного количества
- * @property onRemove обработчик удаления позиции из корзины
- * @property isPending идёт ли сейчас запрос изменения корзины
+ * @property product Товар каталога; price и stock — с сервера
+ * @property quantityInCart 0 = кнопки «В корзину»; >0 = степпер
+ * @property onAdd Первая штука: PUT quantity = 1, не +1 к пустому
+ * @property onQuantity Абсолютное число (степпер)
+ * @property onRemove DELETE, не PUT 0
+ * @property isPending Блок этой карточки, пока мутация именно по этому productId
  */
 interface ProductCardProps {
     product: Product
@@ -27,14 +27,13 @@ interface ProductCardProps {
 }
 
 /**
- * Карточка товара: если позиции нет в корзине — кнопка «В корзину»,
- * иначе степпер количества и кнопка удаления.
- * @param product товар для отображения
- * @param quantityInCart количество товара уже в корзине
- * @param onAdd обработчик добавления первой единицы
- * @param onQuantity обработчик установки абсолютного количества
- * @param onRemove обработчик удаления позиции
- * @param isPending идёт ли сейчас запрос изменения корзины
+ * stock=0 — «Нет в наличии», без степпера. Плюс disabled на quantityInCart >= stock.
+ * @param product Товар каталога
+ * @param quantityInCart Из GET /api/cart, не локальный счётчик
+ * @param onAdd Первая единица
+ * @param onQuantity Абсолютное quantity
+ * @param onRemove Удаление
+ * @param isPending Пока PUT/DELETE этой позиции в полёте
  */
 export function ProductCard({ product, quantityInCart, onAdd, onQuantity, onRemove, isPending }: ProductCardProps) {
     const outOfStock = product.stock === 0

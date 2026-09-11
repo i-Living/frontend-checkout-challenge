@@ -1,5 +1,6 @@
 /**
- * Расчёт доставки: POST quote, ключ по версии корзины и доставке, без молчаливого retry.
+ * POST quote через useQuery. Ключ = version + JSON доставки: поздний ответ старого ключа
+ * не пишется в новый. retry: 0 — повторный POST без спроса создал бы второй расчёт.
  */
 import { type UseQueryResult, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
@@ -9,11 +10,11 @@ import { invalidateCart } from '@/shared/api/invalidate'
 import { keys } from '@/shared/api/query-keys'
 
 /**
- * Создаёт расчёт для текущей версии корзины и доставки.
- * Запоздавший ответ по старому ключу не затирает свежий.
- * @param cartVersion Версия корзины или undefined, пока корзина не загружена.
- * @param delivery Собранная доставка или null, пока форма неполная.
- * @param enabled Можно ли слать POST.
+ * Пока delivery не собран или корзина пуста — enabled=false, POST нет.
+ * CART_VERSION_CONFLICT сбрасывает корзину, чтобы подтянуть новую version.
+ * @param cartVersion version из GET /api/cart; undefined, пока корзина не пришла.
+ * @param delivery Результат buildDelivery; null = форма неполная, ключ общий keys.quote().
+ * @param enabled Страница включает, когда есть товары и полный адрес/пункт.
  */
 export function useQuote(
     cartVersion: number | undefined,

@@ -1,6 +1,6 @@
 /**
- * Одна попытка оплаты: создание платежа + симуляция сценария.
- * Pay и cancel — один поток с разным scenario, общий ключ идемпотентности.
+ * Создание платежа + симуляция. Pay и cancel — одна мутация, разный scenario, один Idempotency-Key.
+ * Две мутации дали бы два ключа и риск второго платежа на двойной клик.
  */
 import { type QueryClient, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
@@ -11,10 +11,10 @@ import { invalidateOrderAndPayments, invalidatePayment, invalidatePayments } fro
 import { orThrow } from '@/shared/lib/assert'
 import { useSessionStore } from '@/shared/store/session-store'
 
-/** Какое действие запустили последним — для текстов ошибки. */
+/** Нужно, чтобы алерт «не удалось оплатить» не показался на ошибке отмены, и наоборот. */
 export type PaymentAction = 'pay' | 'cancel'
 
-/** Результат хука попытки оплаты. */
+/** Страница не знает про createPayment/createSimulation — только эти поля. */
 export interface PaymentAttempt {
     isPending: boolean
     error: unknown
@@ -28,16 +28,17 @@ export interface PaymentAttempt {
 }
 
 /**
- * Проверяет, что ответ отброшен из-за новой попытки (generation-guard).
- * @param error Произвольная ошибка мутации.
+ * Поздний ответ предыдущей попытки. Не показывать как ошибку оплаты — это не сбой API.
+ * @param error mutation.error
  */
 export function isStaleAttemptError(error: unknown): boolean {
     return error instanceof Error && error.message === 'stale'
 }
 
 /**
- * Создаёт попытку оплаты и запускает симуляцию выбранного сценария.
- * @param orderId Идентификатор заказа из маршрута.
+ * generationRef отбрасывает ответ, если пользователь успел нажать ещё раз.
+ * PAYMENT_FINALIZED сбрасывает ключ — «Оплатить снова» должно уйти новым.
+ * @param orderId Из маршрута; без него mutate не стартует.
  */
 export function usePaymentAttempt(orderId: string | undefined): PaymentAttempt {
     const queryClient = useQueryClient()
@@ -86,9 +87,9 @@ export function usePaymentAttempt(orderId: string | undefined): PaymentAttempt {
     })
 
     /**
-     * Стартует новую попытку: новый generation, сброс прошлой ошибки, при FINALIZED — новый ключ.
-     * @param action pay или cancel.
-     * @param scenario Сценарий песочницы.
+     * Инкремент generation до mutate. Иначе старый in-flight onSuccess перезапишет новый paymentId.
+     * @param action Для текста ошибки на странице.
+     * @param scenario С карты sandbox или `cancel`.
      */
     function start(action: PaymentAction, scenario: SimulationScenario): void {
         if (getErrorCode(mutation.error) === 'PAYMENT_FINALIZED' && orderId) {
@@ -114,9 +115,9 @@ export function usePaymentAttempt(orderId: string | undefined): PaymentAttempt {
 }
 
 /**
- * Инвалидирует заказ и платежи после терминального статуса или ORDER_ALREADY_PAID.
- * @param queryClient Клиент Query.
- * @param orderId Идентификатор заказа.
+ * После терминального статуса / ORDER_ALREADY_PAID. Иначе страница успеха увидит старый awaiting_payment.
+ * @param queryClient Кэш Query.
+ * @param orderId UUID заказа.
  */
 export function refreshOrderAfterPayment(queryClient: QueryClient, orderId: string): void {
     void invalidateOrderAndPayments(queryClient, orderId)

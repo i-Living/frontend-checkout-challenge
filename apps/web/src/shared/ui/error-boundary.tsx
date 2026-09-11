@@ -1,6 +1,6 @@
 /**
- * Граница ошибок: ловит падения рендера ниже по дереву,
- * чтобы вместо белого экрана показать запасной экран с действиями.
+ * Ловит падение рендера. Хуки этого не умеют — нужен класс.
+ * RouteError отдельно: errorElement роутера, повтор только через reload.
  */
 import { Component, type ReactNode } from 'react'
 import { useRouteError } from 'react-router'
@@ -8,8 +8,8 @@ import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
 
 /**
- * Запасной экран при падении рендера.
- * @param onRetry сброс ошибки и повторный рендер
+ * Запасной экран. Корзина/заказ на сервере, поэтому «продолжить» безопасно.
+ * @param onRetry В ErrorBoundary — сброс state; в RouteError — location.reload.
  */
 function ErrorFallback({ onRetry }: { onRetry: () => void }) {
     return (
@@ -33,14 +33,14 @@ function ErrorFallback({ onRetry }: { onRetry: () => void }) {
 }
 
 /**
- * Состояние границы ошибок.
+ * null = дети живы. Любое ненулевое значение — уже показали fallback, деталь ошибки в console.
  */
 interface ErrorBoundaryState {
     error: unknown | null
 }
 
 /**
- * Классовая граница ошибок для падений рендера дочернего дерева.
+ * Оборачивает <Outlet>. Не ловит ошибки event handlers и async — только render/lifecycle.
  */
 export class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
     state: ErrorBoundaryState = { error: null }
@@ -62,9 +62,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBound
 }
 
 /**
- * Запасной экран для ошибок роута (errorElement): показывает ту же карточку,
- * повтор — через перезагрузку страницы.
- * @returns Разметка ошибки роута
+ * errorElement роутера. Дерево маршрута уже снято, сброс state не поможет — только reload.
+ * @returns Та же карточка, что у ErrorBoundary.
  */
 export function RouteError() {
     const error = useRouteError()

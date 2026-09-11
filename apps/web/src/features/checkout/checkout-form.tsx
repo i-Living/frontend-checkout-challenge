@@ -1,5 +1,5 @@
 /**
- * Форма оформления заказа: контакты, способ доставки и способ оплаты.
+ * Форма чекаута. noValidate — HTML5 не перебивает наши FIELD_MESSAGES; submit отдаёт черновик наружу.
  */
 
 import { Truck, User, Wallet } from 'lucide-react'
@@ -14,14 +14,14 @@ import { OptionRadioGroup } from '@/shared/ui/option-radio-group'
 import { DeliveryFields } from './delivery-fields'
 
 /**
- * Ошибки полей формы оформления заказа.
+ * Поля с клиентской/серверной ошибкой. apartment нет: оно необязательное и в FIELD_MESSAGES не входит.
  */
 export type CheckoutFieldErrors = Partial<
     Record<'name' | 'email' | 'phone' | 'pickupPointId' | 'city' | 'street' | 'house', string>
 >
 
 /**
- * Пропсы формы оформления заказа.
+ * Контрол без своего стейта: draft живёт в session-store, чтобы пережить ошибку запроса и F5.
  */
 interface CheckoutFormProps {
     draft: CheckoutDraft
@@ -34,7 +34,7 @@ interface CheckoutFormProps {
 }
 
 /**
- * Форма оформления заказа с контактами, доставкой и оплатой.
+ * Контролы из GET /api/checkout/options. Значения — из draft, не из локального useState.
  */
 export function CheckoutForm({
     draft,
@@ -49,8 +49,8 @@ export function CheckoutForm({
     const pickupPoints = pickupMethod?.pickupPoints ?? []
 
     /**
-     * Отменяет стандартную отправку и передает черновик наружу.
-     * @param event событие отправки формы
+     * preventDefault обязателен: без него браузер уйдёт с SPA. Валидация — в onSubmit страницы.
+     * @param event submit формы
      */
     function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()

@@ -1,21 +1,21 @@
 /**
- * Мутации корзины: абсолютное количество и удаление.
- * Одно правило инвалидации для каталога и страницы корзины.
+ * Мутации корзины. Одно правило инвалидации для каталога и страницы корзины —
+ * иначе остаток в карточке и строки корзины разъедутся.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type CartItem, removeCartItem, setCartItem } from '@/shared/api/endpoints'
 import { getErrorCode } from '@/shared/api/errors'
 import { invalidateCart, invalidateCartAndProducts } from '@/shared/api/invalidate'
 
-/** Переменные установки количества: id товара и абсолютное quantity. */
+/** quantity абсолютный, не дельта. Страницы не вызывают setCartItem напрямую. */
 export interface SetCartItemVariables {
     productId: string
     quantity: number
 }
 
 /**
- * Ставит абсолютное количество товара в корзине.
- * После успеха обновляет корзину и каталог (остаток в карточках).
+ * PUT абсолютного количества. INSUFFICIENT_STOCK тоже сбрасывает каталог — stock мог измениться.
+ * CART_ITEM_NOT_FOUND сбрасывает только корзину: товара в каталоге это не касается.
  */
 export function useSetCartItem() {
     const queryClient = useQueryClient()
@@ -37,7 +37,7 @@ export function useSetCartItem() {
 }
 
 /**
- * Удаляет позицию из корзины.
+ * DELETE позиции. Повтор на уже удалённой — 204, onError не вызовется.
  */
 export function useRemoveCartItem() {
     const queryClient = useQueryClient()

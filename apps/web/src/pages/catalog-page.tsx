@@ -1,6 +1,5 @@
 /**
- * Экран каталога (`/`).
- * Список товаров со степпером количества и удалением прямо в карточке.
+ * Каталог `/`. Добавление в серверную корзину прямо из карточки; stock=0 недоступен.
  */
 import { ShoppingBag } from 'lucide-react'
 import { useRemoveCartItem, useSetCartItem } from '@/features/cart/use-cart-mutations'
@@ -13,7 +12,7 @@ import { queryGate } from '@/shared/ui/query-gate'
 import { Skeleton } from '@/shared/ui/skeleton'
 
 /**
- * Скелетон сетки каталога.
+ * Сетка той же колоночности, что и товары — чтобы не прыгала вёрстка.
  */
 function CatalogSkeleton() {
     return (
@@ -31,9 +30,9 @@ function CatalogSkeleton() {
 }
 
 /**
- * Экран каталога (`/`): сетка товаров с количеством в корзине.
- * Пропсов нет. Ветки: скелетон, ошибка загрузки с повтором, сетка; ошибка изменения — алертом.
- * @returns Разметка страницы каталога
+ * queryGate только на каталог: корзина может грузиться позже, карточки уже рисуем с quantity=0.
+ * Ошибка PUT/DELETE — MutationAlert, не замена всей страницы.
+ * @returns Страница каталога
  */
 export function CatalogPage() {
     usePageTitle('Каталог')

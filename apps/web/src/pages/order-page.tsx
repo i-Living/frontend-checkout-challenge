@@ -1,6 +1,6 @@
 /**
- * Экран заказа (`/orders/:orderId`).
- * Отвечает за итог по серверному заказу: успех карты/наличных, ожидание, decline/cancel.
+ * `/orders/:orderId`. Успех только по GET заказа: карта paid+succeeded, наличные confirmed+unpaid.
+ * 201 создания и succeeded платежа сами по себе сюда не ведут.
  */
 import { CircleAlert, LoaderCircle } from 'lucide-react'
 import { Link, useParams } from 'react-router'
@@ -14,7 +14,7 @@ import { queryGate } from '@/shared/ui/query-gate'
 import { Skeleton } from '@/shared/ui/skeleton'
 
 /**
- * Скелетон страницы заказа.
+ * Пока GET заказа. Не показывать «оплачено» по данным из стора.
  */
 function OrderSkeleton() {
     return (
@@ -28,10 +28,8 @@ function OrderSkeleton() {
 }
 
 /**
- * Экран заказа (`/orders/:orderId`): показывает статус только по серверному заказу.
- * Параметр orderId — через useParams, пропсов нет. Ветки: нет id, скелетон, ошибка,
- * успех карты, успех наличных, обработка, decline/cancel, прочий статус.
- * @returns Разметка страницы заказа
+ * Поллинг заказа только при awaiting_payment + pending. Decline/cancel оставляют заказ и ссылку на /pay.
+ * @returns Страница заказа
  */
 export function OrderPage() {
     usePageTitle('Заказ')

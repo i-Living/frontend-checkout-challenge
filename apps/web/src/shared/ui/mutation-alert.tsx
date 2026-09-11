@@ -1,5 +1,5 @@
 /**
- * Алерт ошибки мутации: один перевод toUserMessage на все экраны.
+ * Алерт ошибки мутации. Текст только через toUserMessage — страницы не мапят code сами.
  */
 import { CircleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -7,10 +7,10 @@ import { toUserMessage } from '@/shared/api/errors'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 
 /**
- * Показывает destructive-алерт, если ошибка есть.
- * @param error Ошибка мутации или null/undefined.
- * @param title Заголовок алерта.
- * @param className Классы корневого Alert.
+ * `error == null` → ничего (не пустой Alert). stale-ошибку оплаты отфильтровывает страница, не этот компонент.
+ * @param error mutation.error; null/undefined скрывает блок.
+ * @param title Контекст действия («Не удалось создать заказ»), код в заголовок не класть.
+ * @param className Отступы на странице (mb-4), не вариант алерта.
  */
 export function MutationAlert({
     error,

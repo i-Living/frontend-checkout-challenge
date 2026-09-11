@@ -1,5 +1,5 @@
 /**
- * Точка входа SPA: монтирует React-дерево с провайдерами и роутером в элемент #root.
+ * Точка входа. initTheme() до render — иначе первый кадр вспыхнет светлой темой.
  */
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

@@ -1,6 +1,5 @@
 /**
- * Экран корзины (`/cart`).
- * Отвечает за строки корзины, смену количества, удаление, итог и переход к оформлению.
+ * Корзина `/cart`. Итог — cart.subtotal с API. Пустую нельзя оформить: ссылки на /checkout нет.
  */
 import { ArrowRight, ShoppingBasket } from 'lucide-react'
 import { useMemo } from 'react'
@@ -18,7 +17,7 @@ import { queryGate } from '@/shared/ui/query-gate'
 import { Skeleton } from '@/shared/ui/skeleton'
 
 /**
- * Скелетон списка корзины.
+ * Две строки-заглушки. role=status на списке, не на каждой строке.
  */
 function CartSkeleton() {
     return (
@@ -38,9 +37,8 @@ function CartSkeleton() {
 }
 
 /**
- * Экран корзины (`/cart`): строки товаров, итог и переход к оформлению.
- * Пропсов нет. Ветки: скелетон, ошибка с повтором, пустая корзина, список с итогом.
- * @returns Разметка страницы корзины
+ * Пока мутация строки в полёте, «Перейти к оформлению» disabled — не уходить на чекаут со старой version.
+ * @returns Страница корзины
  */
 export function CartPage() {
     usePageTitle('Корзина')

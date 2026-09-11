@@ -1,5 +1,6 @@
 /**
- * Примитив кнопки shadcn: основное действие, варианты и размеры через cva.
+ * Кнопка магазина. min-h 44px — зона нажатия на 390px, не уменьшать.
+ * asChild рендерит Slot (Link), сохраняя стили кнопки.
  */
 import { Slot } from '@radix-ui/react-slot'
 import type { VariantProps } from 'class-variance-authority'
@@ -36,7 +37,7 @@ const buttonVariants = cva(
 )
 
 /**
- * Кнопка с поддержкой asChild через Slot (например 'Оплатить', 'В корзину').
+ * asChild=true: корень — ребёнок (обычно Link), не <button>. Иначе вложенные кнопки в форме.
  */
 function Button({
     className,

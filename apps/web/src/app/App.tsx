@@ -1,5 +1,5 @@
 /**
- * Корневой layout приложения: шапка со счётчиком корзины и контент текущей страницы.
+ * Layout: шапка со счётчиком из GET /api/cart и Outlet. Счётчик 0, пока корзина не загрузилась — не скелетон шапки.
  */
 import { ShoppingBasket, Store } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router'
@@ -9,9 +9,8 @@ import { cn } from '@/shared/lib/cn'
 import { ErrorBoundary } from '@/shared/ui/error-boundary'
 
 /**
- * Корневой компонент layout.
- * Подтягивает корзину для счётчика в шапке и рендерит активную страницу через outlet.
- * @returns Разметка шапки и контента страницы
+ * ErrorBoundary вокруг Outlet: падение страницы не сносит шапку с корзиной.
+ * @returns Шапка, main, подвал
  */
 export function App() {
     const cartQuery = useCart()

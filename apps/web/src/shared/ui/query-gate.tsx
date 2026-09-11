@@ -1,10 +1,11 @@
 /**
- * Гвард загрузки/ошибки: страницы рендерят happy-path только если queryGate вернул null.
+ * Гвард загрузки/ошибки. Happy-path страницы вызывать только если вернул null —
+ * иначе во время pending полезем в data и словим undefined.
  */
 import type { ReactNode } from 'react'
 import { PageError, PagePending } from '@/shared/ui/query-state'
 
-/** Минимальный контракт результата useQuery, нужный для экрана состояния. */
+/** Достаточно isPending/isError/error/refetch — полный UseQueryResult тащить не нужно. */
 export interface QueryLike {
     isPending: boolean
     isError: boolean
@@ -12,7 +13,7 @@ export interface QueryLike {
     refetch: () => unknown
 }
 
-/** Параметры общего экрана загрузки/ошибки. */
+/** Тексты и скелетон экрана. notFound* включают ветку 404 вместо «повторить». */
 export interface QueryStateOptions {
     title: string
     errorTitle: string
@@ -22,10 +23,9 @@ export interface QueryStateOptions {
 }
 
 /**
- * Если запросы ещё грузятся или упали — возвращает экран состояния, иначе null.
- * Дети страницы рендерятся только после этого гварда, без eager-оценки happy-path.
- * @param queries Один или несколько результатов useQuery.
- * @param options Заголовок, скелетон и тексты ошибки.
+ * pending любого запроса → скелетон; иначе первая ошибка → PageError с повтором всех упавших.
+ * @param queries Один запрос или список (корзина+опции на чекауте).
+ * @param options Заголовок страницы, скелетон, тексты ошибки; notFoundTitle включает ветку 404.
  */
 export function queryGate(queries: QueryLike | QueryLike[], options: QueryStateOptions): ReactNode | null {
     const list = Array.isArray(queries) ? queries : [queries]

@@ -1,10 +1,10 @@
 /**
- * Форматирует сумму в копейках в рубли по локали ru-RU.
- * @param kopecks - Сумма в копейках (например 249000)
- * @param currency - Код валюты, по умолчанию 'RUB'
- * @returns Строка суммы (например formatMoney(249000) → «2 490,00 ₽»)
+ * Суммы API — целые копейки, валюта RUB. Итоги и доставку не считать на клиенте: брать из quote/order/cart.
+ * @param kopecks Целое из API (249000 = 2 490 ₽), не рубли.
+ * @param currency Пока только RUB; форматтер кэшируется по коду.
+ * @returns Строка ru-RU, например «2 490,00 ₽». Неразрывные пробелы — учитывать в тестах.
  */
-/** Кэш форматтеров по валюте, чтобы не создавать Intl.NumberFormat на каждый рендер. */
+/** Кэш Intl.NumberFormat: конструктор тяжёлый, карточки каталога зовут formatMoney на каждый рендер. */
 const formatters = new Map<string, Intl.NumberFormat>()
 
 export function formatMoney(kopecks: number, currency: 'RUB' = 'RUB') {

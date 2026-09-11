@@ -1,11 +1,13 @@
 /**
- * Стор сессии: токен, текущий заказ/оплата, черновик чекаута и ключи идемпотентности в sessionStorage.
+ * Клиентское состояние вкладки: токен, текущий заказ/оплата, черновик чекаута, ключи идемпотентности.
+ * persist в sessionStorage (`checkout.v1`) — F5 восстанавливает, закрытие вкладки нет.
  */
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
 /**
- * Черновик формы чекаута: контакты, доставка, оплата и адрес.
+ * Черновик формы. deliveryMethod/paymentMethod — строки, потому что id приходят из options API,
+ * а не из локального union; пустая строка = «ещё не выбрали».
  */
 export interface CheckoutDraft {
     name: string
@@ -21,7 +23,7 @@ export interface CheckoutDraft {
 }
 
 /**
- * Последняя попытка создания заказа: тело запроса и ключ идемпотентности для повтора.
+ * Последний POST заказа: без сохранённого body нельзя понять, повтор это или новая попытка.
  */
 export interface LastOrderEntry {
     key: string
@@ -29,7 +31,7 @@ export interface LastOrderEntry {
 }
 
 /**
- * Последняя попытка оплаты: заказ, тело запроса и ключ идемпотентности для повтора.
+ * Последний POST платежа. Ключ чужого orderId не переиспользуем.
  */
 export interface LastPaymentEntry {
     orderId: string
@@ -38,57 +40,57 @@ export interface LastPaymentEntry {
 }
 
 /**
- * Состояние сессии и экшены для токена, заказа, черновика и идемпотентности.
+ * Стор сессии. Серверное состояние (корзина, заказ) сюда не кладём — оно в Query.
  */
 interface SessionState {
-    /** Токен сессии из POST /api/sessions, подставляется в Authorization. */
+    /** Bearer-токен POST /api/sessions. Не session id. */
     token: string | null
-    /** Текущий заказ для страниц оплаты и статуса. */
+    /** Текущий заказ для /orders/:id и восстановления /pay без id в URL. */
     orderId: string | null
-    /** Текущая оплата для отслеживания статуса. */
+    /** Текущая попытка оплаты для поллинга после F5. */
     paymentId: string | null
-    /** Черновик формы чекаута, переживает перезагрузку вкладки. */
+    /** Поля формы чекаута: ошибка запроса не должна их стирать. */
     draft: CheckoutDraft
-    /** Последняя попытка заказа с ключом идемпотентности для безопасного ретрая. */
+    /** Ключ+тело заказа для безопасного ретрая сети. */
     lastOrder: LastOrderEntry | null
-    /** Последняя попытка оплаты с ключом идемпотентности для безопасного ретрая. */
+    /** Ключ+тело платежа для безопасного ретрая сети. */
     lastPayment: LastPaymentEntry | null
     /**
-     * Кладёт токен сессии.
-     * @param token - Токен из POST /api/sessions
+     * Пишет токен. Не вызывать с session id из data.id.
+     * @param token data.token из POST /api/sessions
      */
     setToken: (token: string) => void
-    /** Чистит токен сессии (выход). */
+    /** Сброс токена перед повторным ensureSession после 401 SESSION_*. Выхода в UI нет. */
     clearToken: () => void
     /**
-     * Кладёт текущий заказ.
-     * @param orderId - Идентификатор заказа или null для сброса
+     * Текущий заказ. null после ухода с оплаты, если больше не нужно resume.
+     * @param orderId UUID или null
      */
     setOrder: (orderId: string | null) => void
     /**
-     * Кладёт текущую оплату.
-     * @param paymentId - Идентификатор оплаты или null для сброса
+     * Текущая попытка. null при создании нового заказа, чтобы не поллить чужой платёж.
+     * @param paymentId UUID или null
      */
     setPayment: (paymentId: string | null) => void
     /**
-     * Частично обновляет черновик чекаута.
-     * @param patch - Часть полей черновика для слияния
+     * Слияние черновика. Не затирает непереданные поля — иначе смена имени сбросит адрес.
+     * @param patch Часть полей
      */
     patchDraft: (patch: Partial<CheckoutDraft>) => void
     /**
-     * Кладёт последнюю попытку заказа для ретрая тем же ключом.
-     * @param entry - Запись с ключом и телом или null для сброса
+     * Запись для getOrCreateOrderKey. null после успеха или IDEMPOTENCY_CONFLICT.
+     * @param entry Ключ и тело или null
      */
     setLastOrder: (entry: LastOrderEntry | null) => void
     /**
-     * Кладёт последнюю попытку оплаты для ретрая тем же ключом.
-     * @param entry - Запись с заказом, ключом и телом или null для сброса
+     * Запись для getOrCreatePaymentKey. null после успеха или PAYMENT_FINALIZED.
+     * @param entry Ключ, заказ и тело или null
      */
     setLastPayment: (entry: LastPaymentEntry | null) => void
 }
 
 /**
- * Пустой черновик чекаута для инициализации и сброса формы.
+ * Пустой черновик. Не класть тестовые контакты по умолчанию — форма должна быть пустой.
  */
 const emptyDraft: CheckoutDraft = {
     name: '',
@@ -104,8 +106,7 @@ const emptyDraft: CheckoutDraft = {
 }
 
 /**
- * Хук zustand-стора сессии с персистом в sessionStorage под ключом checkout.v1.
- * Хранит токен, заказ/оплату, черновик и последние идемпотентные попытки.
+ * persist в sessionStorage, не localStorage: токен и черновик не должны пережить закрытие вкладки.
  */
 export const useSessionStore = create<SessionState>()(
     persist(

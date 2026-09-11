@@ -1,5 +1,5 @@
 /**
- * Поллинг статуса платежа до терминального состояния.
+ * Поллинг GET платежа. Останавливается на succeeded|failed|cancelled и при enabled=false (уход со страницы).
  */
 import { useQuery } from '@tanstack/react-query'
 import { getPayment, type Payment } from '@/shared/api/endpoints'
@@ -7,27 +7,27 @@ import { keys } from '@/shared/api/query-keys'
 import { orThrow } from '@/shared/lib/assert'
 
 /**
- * Терминальные статусы платежа, при которых опрос останавливается.
+ * Терминальные статусы. pending/processing продолжают refetchInterval; остальные — false.
  */
 const TERMINAL = ['succeeded', 'failed', 'cancelled'] as const
 
 /**
- * Терминальный статус платежа.
+ * Узкий union для isTerminalStatus; Payment['status'] шире (есть pending/processing).
  */
 type TerminalStatus = (typeof TERMINAL)[number]
 
 /**
- * Проверяет, является ли статус терминальным.
- * @param status статус платежа с сервера
+ * Опрос можно выключать только здесь. Decline — failed, это терминал, не HTTP-ошибка.
+ * @param status status с GET /api/payments/:id
  */
 function isTerminalStatus(status: Payment['status']): status is TerminalStatus {
     return (TERMINAL as readonly string[]).includes(status)
 }
 
 /**
- * Результат опроса платежа.
- * @property payment текущий платеж или undefined до загрузки
- * @property isTerminal достиг ли платеж терминального статуса
+ * Результат опроса.
+ * @property payment undefined, пока нет id или первый GET не пришёл
+ * @property isTerminal true → страница инвалидирует заказ и может редиректить
  */
 interface PaymentPollResult {
     payment: Payment | undefined
@@ -35,12 +35,11 @@ interface PaymentPollResult {
 }
 
 /**
- * Опрашивает статус платежа до терминального состояния.
- * @param paymentId id платежа или пустое значение
- * @param enabled разрешен ли опрос
- * @param intervalMs пауза между опросами (по умолчанию 800; после simulations
- * подставляется серверный Retry-After)
- * @returns текущий платеж и флаг терминального состояния
+ * Без paymentId запрос выключен. intervalMs после симуляции — Retry-After, не константа 800.
+ * @param paymentId Из попытки, стора или resume списка
+ * @param enabled false на наличном заказе и при размонтировании страницы
+ * @param intervalMs Пауза refetchInterval, пока status pending/processing
+ * @returns payment и isTerminal
  */
 export function usePaymentPoll(
     paymentId: string | null | undefined,

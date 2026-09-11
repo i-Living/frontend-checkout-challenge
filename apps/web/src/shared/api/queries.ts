@@ -1,6 +1,6 @@
 /**
- * Хуки TanStack Query поверх эндпоинтов.
- * Страницы не задают queryKey/queryFn — только читают данные.
+ * Хуки Query. Страницы не задают queryKey/queryFn — только читают data/status.
+ * Мутации живут в features/*: у них своя инвалидация.
  */
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import { orThrow } from '@/shared/lib/assert'
@@ -23,7 +23,7 @@ import {
 import { keys } from './query-keys'
 
 /**
- * Корзина текущей сессии.
+ * Корзина текущей сессии. Пустой массив items — валидный ответ, не ошибка.
  */
 export function useCart(): UseQueryResult<Cart> {
     return useQuery({
@@ -33,7 +33,7 @@ export function useCart(): UseQueryResult<Cart> {
 }
 
 /**
- * Каталог товаров.
+ * Каталог без токена. stock=0 рисуется как «нет в наличии», не как ошибка загрузки.
  */
 export function useProducts(): UseQueryResult<ProductList> {
     return useQuery({
@@ -43,8 +43,8 @@ export function useProducts(): UseQueryResult<ProductList> {
 }
 
 /**
- * Опции доставки и оплаты.
- * @param staleTime Переопределение свежести кэша (например сводка заказа).
+ * Подписи доставки/оплаты и пункты выдачи. Не хардкодить title на клиенте.
+ * @param staleTime На сводке заказа передаём 60s, чтобы не дёргать опции на каждом заходе.
  */
 export function useCheckoutOptions(staleTime?: number): UseQueryResult<CheckoutOptions> {
     return useQuery({
@@ -55,9 +55,9 @@ export function useCheckoutOptions(staleTime?: number): UseQueryResult<CheckoutO
 }
 
 /**
- * Заказ по id из маршрута.
- * @param orderId Идентификатор заказа или пусто, пока маршрута нет.
- * @param refetchInterval Интервал опроса, пока заказ в промежуточном статусе.
+ * Заказ с сервера — источник истины для успеха. 201 создания заказа успехом не считается.
+ * @param orderId Из маршрута; без него запрос выключен (enabled).
+ * @param refetchInterval Пока awaiting_payment + pending — опрос; иначе false.
  */
 export function useOrder(
     orderId: string | undefined,
@@ -72,8 +72,8 @@ export function useOrder(
 }
 
 /**
- * Список заказов сессии (восстановление потерянного orderId).
- * @param enabled Выполнять ли запрос.
+ * Список заказов сессии. Нужен, когда orderId нет в URL и в сторе — берём последний.
+ * @param enabled На /pay без id; на обычной странице заказа не дергать.
  */
 export function useOrdersList(enabled = true): UseQueryResult<OrderList> {
     return useQuery({
@@ -84,9 +84,9 @@ export function useOrdersList(enabled = true): UseQueryResult<OrderList> {
 }
 
 /**
- * Попытки оплаты заказа.
- * @param orderId Идентификатор заказа.
- * @param enabled Выполнять ли запрос.
+ * Попытки заказа, новые первыми. Resume: pending/processing из этого списка.
+ * @param orderId Из маршрута.
+ * @param enabled false для наличного заказа — онлайн-оплата не нужна.
  */
 export function usePayments(orderId: string | undefined, enabled = true): UseQueryResult<PaymentList> {
     return useQuery({
@@ -97,8 +97,8 @@ export function usePayments(orderId: string | undefined, enabled = true): UseQue
 }
 
 /**
- * Тестовые карты песочницы.
- * @param enabled Выполнять ли запрос.
+ * Тестовые карты: title + маска, без PAN/CVC. Сценарий карты уходит в createSimulation.
+ * @param enabled false, пока заказ не card — sandbox на наличных не грузим.
  */
 export function useSandbox(enabled = true): UseQueryResult<Sandbox> {
     return useQuery({

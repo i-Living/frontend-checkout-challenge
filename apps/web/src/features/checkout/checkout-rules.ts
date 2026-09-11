@@ -1,12 +1,13 @@
 /**
- * Правила оформления: клиентская валидация, сборка доставки и разбор ошибок заказа.
+ * Правила чекаута: валидация, сборка delivery для quote, разбор VALIDATION_ERROR.
+ * Суммы сюда не входят — они только из quote.
  */
 import type { CreateQuoteDelivery } from '@/shared/api/endpoints'
 import { isApiError, toUserMessage } from '@/shared/api/errors'
 import type { CheckoutDraft } from '@/shared/store/session-store'
 import type { CheckoutFieldErrors } from './checkout-form'
 
-/** Тексты ошибок полей: одни и те же на клиенте и при VALIDATION_ERROR с сервера. */
+/** Одни тексты на клиенте и на серверном VALIDATION_ERROR. Серверный message технический — не показываем. */
 export const FIELD_MESSAGES = {
     name: 'Укажите имя',
     email: 'Укажите корректный email',
@@ -18,9 +19,9 @@ export const FIELD_MESSAGES = {
 } as const satisfies Record<keyof CheckoutFieldErrors, string>
 
 /**
- * Проверяет черновик формы оформления на клиенте.
- * @param draft Черновик из session-store
- * @returns Карта полевых ошибок, пустая — если всё корректно
+ * Клиентская проверка до POST. Пустая карта — можно собирать заказ; иначе submit не идёт.
+ * @param draft Черновик из session-store, не из DOM.
+ * @returns Ошибки полей; apartment не валидируется (необязательное).
  */
 export function validateDraft(draft: CheckoutDraft): CheckoutFieldErrors {
     const errors: CheckoutFieldErrors = {}
@@ -50,9 +51,9 @@ export function validateDraft(draft: CheckoutDraft): CheckoutFieldErrors {
 }
 
 /**
- * Строит доставку для quote из черновика (курьер или самовывоз).
- * @param draft Черновик из session-store
- * @returns Доставка для quote либо null, если данных не хватает
+ * Тело delivery для POST /api/quotes. null = quote ещё не слать (поля пустые).
+ * @param draft Черновик; для курьера пустой apartment не попадает в JSON.
+ * @returns CreateQuoteDelivery или null.
  */
 export function buildDelivery(draft: CheckoutDraft): CreateQuoteDelivery | null {
     if (draft.deliveryMethod === 'courier') {
@@ -78,21 +79,19 @@ export function buildDelivery(draft: CheckoutDraft): CreateQuoteDelivery | null 
 }
 
 /**
- * Превращает ошибку создания заказа в текст для алерта.
- * Делегирует в общий перевод кодов API.
- * @param error Ошибка создания заказа
- * @returns Текст сообщения пользователю
+ * Алерт создания заказа. Не дублировать карту кодов здесь — она в errors.ts.
+ * @param error mutation.error createOrder
+ * @returns Строка для MutationAlert
  */
 export function toOrderErrorMessage(error: unknown): string {
     return toUserMessage(error)
 }
 
 /**
- * Маппит серверную VALIDATION_ERROR в полевые ошибки формы.
- * Неизвестные поля (например apartment) сюда не попадают: их текст показывает
- * общий алерт через toOrderErrorMessage (error.message).
- * @param error Ошибка создания заказа
- * @returns Карта полевых ошибок либо null, если это не серверная валидация
+ * VALIDATION_ERROR → поля формы. Неизвестный leaf (apartment) в карту не идёт —
+ * его показывает общий алерт, чтобы не потерять текст.
+ * @param error mutation.error createOrder
+ * @returns Карта известных полей или null, если это не VALIDATION_ERROR.
  */
 export function toServerFieldErrors(error: unknown): CheckoutFieldErrors | null {
     if (!isApiError(error) || error.code !== 'VALIDATION_ERROR' || !error.fields) {
