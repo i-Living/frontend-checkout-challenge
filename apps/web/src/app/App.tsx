@@ -3,6 +3,7 @@
  */
 import { ShoppingBasket, Store } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router'
+import { routes } from '@/app/routes'
 import { ThemeToggle } from '@/features/theme/theme-toggle'
 import { useCart } from '@/shared/api/queries'
 import { cn } from '@/shared/lib/cn'
@@ -21,7 +22,7 @@ export function App() {
                 <div className='mx-auto flex w-full max-w-5xl items-center justify-between gap-2 px-4 py-3'>
                     <NavLink
                         className='group flex min-w-0 items-center gap-2.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
-                        to='/'
+                        to={routes.catalog}
                     >
                         <span className='flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition-transform group-hover:-rotate-6'>
                             <Store aria-hidden='true' className='size-5' />
@@ -36,7 +37,7 @@ export function App() {
                                     isActive && 'border-primary/40 bg-accent',
                                 )
                             }
-                            to='/cart'
+                            to={routes.cart}
                         >
                             <ShoppingBasket aria-hidden='true' className='size-4' />
                             Корзина ({count})

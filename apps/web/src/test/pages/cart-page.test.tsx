@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { routes } from '@/app/routes'
 import { CartPage } from '@/pages/cart-page'
 import { getCart, listProducts, removeCartItem, setCartItem } from '@/shared/api/endpoints'
 import { formatMoney } from '@/shared/lib/money'
@@ -35,7 +36,7 @@ describe('CartPage', () => {
         renderApp(<CartPage />)
         expect(await screen.findByText('Корзина пуста')).toBeInTheDocument()
         expect(screen.queryByRole('link', { name: /Перейти к оформлению/ })).not.toBeInTheDocument()
-        expect(screen.getByRole('link', { name: 'Вернуться в каталог' })).toHaveAttribute('href', '/')
+        expect(screen.getByRole('link', { name: 'Вернуться в каталог' })).toHaveAttribute('href', routes.catalog)
     })
 
     it('меняет количество абсолютным PUT и показывает итог из API', async () => {
@@ -44,7 +45,7 @@ describe('CartPage', () => {
         renderApp(<CartPage />)
         expect(await screen.findByText('Лампа Orbit')).toBeInTheDocument()
         expect(screen.getAllByText(byNormalizedText(formatMoney(249000))).length).toBeGreaterThan(0)
-        expect(screen.getByRole('link', { name: /Перейти к оформлению/ })).toHaveAttribute('href', '/checkout')
+        expect(screen.getByRole('link', { name: /Перейти к оформлению/ })).toHaveAttribute('href', routes.checkout)
         await user.click(screen.getByRole('button', { name: 'Увеличить количество' }))
         await waitFor(() => expect(setCartItemMock).toHaveBeenCalledWith('lamp-orbit', 2))
         await user.click(screen.getByRole('button', { name: 'Удалить' }))

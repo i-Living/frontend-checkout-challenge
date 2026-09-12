@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, Info, LoaderCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router'
+import { routes } from '@/app/routes'
 import { CardPicker } from '@/features/payment/card-picker'
 import { refreshOrderAfterPayment, usePaymentAttempt } from '@/features/payment/use-payment-attempt'
 import { usePaymentPoll } from '@/features/payment/use-payment-poll'
@@ -81,20 +82,20 @@ export function PaymentPage() {
     useEffect(() => {
         if (payment?.status === 'succeeded' && orderId) {
             refreshOrderAfterPayment(queryClient, orderId)
-            navigate(`/orders/${orderId}`, { replace: true })
+            navigate(routes.orderRoute(orderId), { replace: true })
         }
     }, [payment?.status, orderId, queryClient, navigate])
 
     useEffect(() => {
         if (attempt.errorCode === 'ORDER_ALREADY_PAID' && orderId) {
             refreshOrderAfterPayment(queryClient, orderId)
-            navigate(`/orders/${orderId}`, { replace: true })
+            navigate(routes.orderRoute(orderId), { replace: true })
         }
     }, [attempt.errorCode, orderId, queryClient, navigate])
 
     if (!orderId) {
         if (storedOrderId) {
-            return <Navigate replace to={`/orders/${storedOrderId}/pay`} />
+            return <Navigate replace to={routes.paymentRoute(storedOrderId)} />
         }
         const recoveryBlocked = queryGate(recoveryOrdersQuery, {
             title: 'Оплата заказа',
@@ -106,9 +107,9 @@ export function PaymentPage() {
         }
         const latest = recoveryOrdersQuery.data?.[0]
         if (latest) {
-            return <Navigate replace to={`/orders/${latest.id}/pay`} />
+            return <Navigate replace to={routes.paymentRoute(latest.id)} />
         }
-        return <Navigate replace to='/' />
+        return <Navigate replace to={routes.catalog} />
     }
 
     const orderBlocked = queryGate(orderQuery, {
@@ -128,15 +129,15 @@ export function PaymentPage() {
     }
 
     if (order.paymentMethod !== 'card') {
-        return <Navigate replace to={`/orders/${orderId}`} />
+        return <Navigate replace to={routes.orderRoute(orderId)} />
     }
 
     if (order.status === 'paid' && order.paymentStatus === 'succeeded') {
-        return <Navigate replace to={`/orders/${orderId}`} />
+        return <Navigate replace to={routes.orderRoute(orderId)} />
     }
 
     if (attempt.errorCode === 'PAYMENT_NOT_REQUIRED') {
-        return <Navigate replace to={`/orders/${orderId}`} />
+        return <Navigate replace to={routes.orderRoute(orderId)} />
     }
 
     const sandboxBlocked = queryGate(sandboxQuery, {
@@ -273,7 +274,7 @@ export function PaymentPage() {
                         </Button>
                     </div>
                     <Button asChild className='w-fit' variant='link'>
-                        <Link to={`/orders/${orderId}`}>К заказу</Link>
+                        <Link to={routes.orderRoute(orderId)}>К заказу</Link>
                     </Button>
                 </CardContent>
             </Card>

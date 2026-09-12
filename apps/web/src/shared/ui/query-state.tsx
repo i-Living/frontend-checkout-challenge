@@ -5,6 +5,7 @@
 import { CircleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
+import { routes } from '@/app/routes'
 import { isNotFoundError, toUserMessage } from '@/shared/api/errors'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/alert'
 import { Button } from '@/shared/ui/button'
@@ -62,7 +63,7 @@ export function PageError({
             <div className='mt-4 flex min-w-0 flex-wrap gap-2'>
                 {notFound ? (
                     <Button asChild className='w-full sm:w-auto'>
-                        <Link to='/'>Вернуться в каталог</Link>
+                        <Link to={routes.catalog}>Вернуться в каталог</Link>
                     </Button>
                 ) : onRetry ? (
                     <Button className='w-full sm:w-auto' onClick={() => void onRetry()} type='button'>

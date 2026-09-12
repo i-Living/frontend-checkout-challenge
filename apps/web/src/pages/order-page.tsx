@@ -4,6 +4,7 @@
  */
 import { CircleAlert, LoaderCircle } from 'lucide-react'
 import { Link, useParams } from 'react-router'
+import { routes } from '@/app/routes'
 import { OrderSuccessCard } from '@/features/order/order-success-card'
 import { OrderSummary } from '@/features/order/order-summary'
 import { useOrder } from '@/shared/api/queries'
@@ -48,7 +49,7 @@ export function OrderPage() {
                     <AlertDescription>Нет идентификатора заказа.</AlertDescription>
                 </Alert>
                 <Button asChild className='mt-4 w-full sm:w-auto'>
-                    <Link to='/'>Вернуться в каталог</Link>
+                    <Link to={routes.catalog}>Вернуться в каталог</Link>
                 </Button>
             </div>
         )
@@ -104,7 +105,7 @@ export function OrderPage() {
                     Оплата ещё обрабатывается
                 </p>
                 <Button asChild className='mt-4 w-full sm:w-auto' variant='outline'>
-                    <Link to={`/orders/${orderId}/pay`}>Вернуться к оплате</Link>
+                    <Link to={routes.paymentRoute(orderId)}>Вернуться к оплате</Link>
                 </Button>
             </div>
         )
@@ -121,7 +122,7 @@ export function OrderPage() {
                     <OrderSummary order={order} />
                 </div>
                 <Button asChild className='mt-4 w-full sm:w-auto'>
-                    <Link to={`/orders/${orderId}/pay`}>Вернуться к оплате</Link>
+                    <Link to={routes.paymentRoute(orderId)}>Вернуться к оплате</Link>
                 </Button>
             </div>
         )

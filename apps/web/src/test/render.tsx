@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { type RenderOptions, render } from '@testing-library/react'
 import type { ReactElement, ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
+import { routes } from '@/app/routes'
 
 /**
  * Новый кэш на тест. gcTime Infinity — данные не уезжают, пока assert ещё идёт.
@@ -34,7 +35,7 @@ interface RenderAppOptions extends Omit<RenderOptions, 'wrapper'> {
  * @returns RTL + queryClient этого прогона
  */
 export function renderApp(ui: ReactElement, options: RenderAppOptions = {}) {
-    const { route = '/', queryClient = createTestQueryClient(), ...renderOptions } = options
+    const { route = routes.catalog, queryClient = createTestQueryClient(), ...renderOptions } = options
     function Wrapper({ children }: { children: ReactNode }) {
         return (
             <QueryClientProvider client={queryClient}>

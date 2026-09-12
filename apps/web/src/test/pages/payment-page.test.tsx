@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { routes } from '@/app/routes'
 import { PaymentPage } from '@/pages/payment-page'
 import {
     createPayment,
@@ -38,12 +39,12 @@ const getPaymentMock = vi.mocked(getPayment)
 const createPaymentMock = vi.mocked(createPayment)
 const createSimulationMock = vi.mocked(createSimulation)
 
-function renderPay(route = '/orders/order-1/pay') {
+function renderPay(route = routes.paymentRoute('order-1')) {
     return renderApp(
         <Routes>
-            <Route element={<PaymentPage />} path='/orders/:orderId/pay' />
-            <Route element={<div>order-screen</div>} path='/orders/:orderId' />
-            <Route element={<div>catalog-screen</div>} path='/' />
+            <Route element={<PaymentPage />} path={routes.payment} />
+            <Route element={<div>order-screen</div>} path={routes.order} />
+            <Route element={<div>catalog-screen</div>} path={routes.catalog} />
         </Routes>,
         { route },
     )

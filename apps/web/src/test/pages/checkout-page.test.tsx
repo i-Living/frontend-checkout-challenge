@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { routes } from '@/app/routes'
 import { CheckoutPage } from '@/pages/checkout-page'
 import { createOrder, createQuote, getCart, getCheckoutOptions } from '@/shared/api/endpoints'
 import { useSessionStore } from '@/shared/store/session-store'
@@ -35,12 +36,12 @@ const createOrderMock = vi.mocked(createOrder)
 function renderCheckout() {
     return renderApp(
         <Routes>
-            <Route element={<CheckoutPage />} path='/checkout' />
-            <Route element={<div>cart-screen</div>} path='/cart' />
-            <Route element={<div>pay-screen</div>} path='/orders/:orderId/pay' />
-            <Route element={<div>order-screen</div>} path='/orders/:orderId' />
+            <Route element={<CheckoutPage />} path={routes.checkout} />
+            <Route element={<div>cart-screen</div>} path={routes.cart} />
+            <Route element={<div>pay-screen</div>} path={routes.payment} />
+            <Route element={<div>order-screen</div>} path={routes.order} />
         </Routes>,
-        { route: '/checkout' },
+        { route: routes.checkout },
     )
 }
 

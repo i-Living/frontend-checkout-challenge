@@ -2,6 +2,7 @@
  * Неизвестный маршрут. Не путать с 404 заказа — тот рисует OrderPage через queryGate.
  */
 import { Link } from 'react-router'
+import { routes } from '@/app/routes'
 import { usePageTitle } from '@/shared/lib/use-page-title'
 import { Button } from '@/shared/ui/button'
 
@@ -16,7 +17,7 @@ export function NotFoundPage() {
             <h1 className='mb-2 font-semibold text-2xl tracking-tight'>Страница не найдена</h1>
             <p className='mb-4 text-muted-foreground text-sm'>Такого адреса нет. Возможно, ссылка устарела.</p>
             <Button asChild className='w-full sm:w-auto'>
-                <Link to='/'>Вернуться в каталог</Link>
+                <Link to={routes.catalog}>Вернуться в каталог</Link>
             </Button>
         </div>
     )

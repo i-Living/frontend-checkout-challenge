@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, LoaderCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router'
+import { routes } from '@/app/routes'
 import { type CheckoutFieldErrors, CheckoutForm } from '@/features/checkout/checkout-form'
 import { buildDelivery, toServerFieldErrors, validateDraft } from '@/features/checkout/checkout-rules'
 import { useQuote } from '@/features/checkout/use-quote'
@@ -119,9 +120,9 @@ export function CheckoutPage() {
             setPaymentId(null)
             void invalidateCart(queryClient)
             if (order.paymentMethod === 'cash_on_delivery') {
-                navigate(`/orders/${order.id}`)
+                navigate(routes.orderRoute(order.id))
             } else {
-                navigate(`/orders/${order.id}/pay`)
+                navigate(routes.paymentRoute(order.id))
             }
         },
         onError: (error: unknown) => {
@@ -217,7 +218,7 @@ export function CheckoutPage() {
     }
 
     if (cart.items.length === 0) {
-        return <Navigate replace to='/cart' />
+        return <Navigate replace to={routes.cart} />
     }
 
     const submitLabel = draft.paymentMethod === 'cash_on_delivery' ? 'Оформить заказ' : 'Оформить и перейти к оплате'

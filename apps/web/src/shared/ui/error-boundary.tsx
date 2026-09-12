@@ -4,6 +4,7 @@
  */
 import { Component, type ReactNode } from 'react'
 import { useRouteError } from 'react-router'
+import { routes } from '@/app/routes'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
 
@@ -24,7 +25,7 @@ function ErrorFallback({ onRetry }: { onRetry: () => void }) {
                         Попробовать снова
                     </Button>
                     <Button asChild className='w-full sm:w-auto' variant='outline'>
-                        <a href='/'>Вернуться в каталог</a>
+                        <a href={routes.catalog}>Вернуться в каталог</a>
                     </Button>
                 </div>
             </CardContent>

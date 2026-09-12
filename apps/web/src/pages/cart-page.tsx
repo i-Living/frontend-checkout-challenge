@@ -4,6 +4,7 @@
 import { ArrowRight, ShoppingBasket } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link } from 'react-router'
+import { routes } from '@/app/routes'
 import { CartLine } from '@/features/cart/cart-line'
 import { useRemoveCartItem, useSetCartItem } from '@/features/cart/use-cart-mutations'
 import { useCart, useProducts } from '@/shared/api/queries'
@@ -76,7 +77,7 @@ export function CartPage() {
                         </p>
                         <div className='mt-2 flex min-w-0 flex-wrap justify-center gap-2'>
                             <Button asChild className='w-full sm:w-auto' variant='outline'>
-                                <Link to='/'>Вернуться в каталог</Link>
+                                <Link to={routes.catalog}>Вернуться в каталог</Link>
                             </Button>
                         </div>
                     </CardContent>
@@ -145,7 +146,7 @@ export function CartPage() {
                                 </Button>
                             ) : (
                                 <Button asChild className='group w-full'>
-                                    <Link to='/checkout'>
+                                    <Link to={routes.checkout}>
                                         Перейти к оформлению
                                         <ArrowRight
                                             aria-hidden='true'

@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react'
 import { Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { routes } from '@/app/routes'
 import { OrderPage } from '@/pages/order-page'
 import { getCheckoutOptions, getOrder } from '@/shared/api/endpoints'
 import { makeApiError, makeCheckoutOptions, makeOrder } from '@/test/fixtures'
@@ -17,9 +18,9 @@ const getCheckoutOptionsMock = vi.mocked(getCheckoutOptions)
 function renderOrderPage() {
     return renderApp(
         <Routes>
-            <Route element={<OrderPage />} path='/orders/:orderId' />
+            <Route element={<OrderPage />} path={routes.order} />
         </Routes>,
-        { route: '/orders/order-1' },
+        { route: routes.orderRoute('order-1') },
     )
 }
 
@@ -55,7 +56,10 @@ describe('OrderPage', () => {
         renderOrderPage()
         expect(await screen.findByText('Оплата ещё обрабатывается')).toBeInTheDocument()
         expect(screen.queryByRole('heading', { name: 'Заказ оплачен' })).not.toBeInTheDocument()
-        expect(screen.getByRole('link', { name: 'Вернуться к оплате' })).toHaveAttribute('href', '/orders/order-1/pay')
+        expect(screen.getByRole('link', { name: 'Вернуться к оплате' })).toHaveAttribute(
+            'href',
+            routes.paymentRoute('order-1'),
+        )
     })
 
     it('после отказа оставляет заказ и предлагает вернуться к оплате', async () => {
